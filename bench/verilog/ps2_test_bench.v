@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.3  2002/02/20 15:20:02  mihad
+// Little/big endian changes incorporated
+//
 // Revision 1.2  2002/02/18 18:08:31  mihad
 // One bug fixed
 //
@@ -61,17 +64,17 @@
 /*
  * controller commands
  */
-`define KBD_READ_MODE       32'h20
-`define KBD_WRITE_MODE      32'h60
-`define KBD_SELF_TEST       32'hAA
-`define KBD_SELF_TEST2      32'hAB
-`define KBD_CNTL_ENABLE     32'hAE
+`define KBD_READ_MODE       32'h20_00_00_00
+`define KBD_WRITE_MODE      32'h60_00_00_00
+`define KBD_SELF_TEST       32'hAA_00_00_00
+`define KBD_SELF_TEST2      32'hAB_00_00_00
+`define KBD_CNTL_ENABLE     32'hAE_00_00_00
 /*
  * keyboard commands
  */
-`define KBD_ENABLE          32'hF4
-`define KBD_DISABLE         32'hF5
-`define KBD_RESET           32'hFF
+`define KBD_ENABLE          32'hF4_00_00_00
+`define KBD_DISABLE         32'hF5_00_00_00
+`define KBD_RESET           32'hFF_00_00_00
 /*
  * keyboard replies
  */
@@ -87,11 +90,11 @@
 /*
  * keyboard controller mode register bits
  */
-`define KBD_EKI             32'h01
-`define KBD_SYS             32'h04
-`define KBD_DMS             32'h20
-`define KBD_KCC             32'h40
-`define KBD_DISABLE_COMMAND 32'h10
+`define KBD_EKI             32'h01_00_00_00
+`define KBD_SYS             32'h04_00_00_00
+`define KBD_DMS             32'h20_00_00_00
+`define KBD_KCC             32'h40_00_00_00
+`define KBD_DISABLE_COMMAND 32'h10_00_00_00
 
 module ps2_test_bench() ;
 
@@ -451,7 +454,7 @@ begin:main
         if ( status !== 1 )
             disable main ;
 
-        if ( (data & (`KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC)) !== (`KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC)  )
+        if ( ({data, 24'h0} & (`KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC)) !== (`KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC)  )
         begin
             $display("Error! Read command byte returned wrong value!") ;
             #400 $stop ;
@@ -459,7 +462,7 @@ begin:main
     end
     begin
         @(char_valid) ;
-        if ( received_char !== `KBD_RESET )
+        if ( {received_char, 24'h0} !== `KBD_RESET )
         begin
             $display("Error! Keyboard received invalid character/command") ;
             #400 $stop ; 
@@ -480,7 +483,7 @@ begin:main
         ) ;
 
          @(char_valid) ;
-        if ( received_char !== `KBD_DISABLE )
+        if ( {received_char,24'h0} !== `KBD_DISABLE )
         begin
             $display("Error! Keyboard received invalid character/command") ;
             #400 $stop ;
@@ -494,7 +497,7 @@ begin:main
         ) ; 
 
         @(char_valid) ;
-        if ( received_char !== `KBD_ENABLE )
+        if ( {received_char,24'h0} !== `KBD_ENABLE )
         begin
             $display("Error! Keyboard received invalid character/command") ;
             #400 $stop ;
@@ -1112,7 +1115,7 @@ begin:main
     join
 
     // do D2 command, that copies parameter in input buffer to output buffer
-    kbd_write( `KBD_CNTL_REG, 32'hD2, ok_controler ) ;
+    kbd_write( `KBD_CNTL_REG, 32'hD2_00_00_00, ok_controler ) ;
     if ( ok_controler !== 1 )
         disable main ;
 

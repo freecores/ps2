@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.3  2002/02/20 15:20:10  mihad
+// Little/big endian changes incorporated
+//
 // Revision 1.2  2002/02/18 18:07:55  mihad
 // One bug fixed
 //
@@ -197,7 +200,7 @@ begin
     if ( wb_rst_i )
         current_command <= #1 8'h0 ;
     else if ( send_command_reg )
-        current_command <= #1 wb_dat_i[7:0] ;
+        current_command <= #1 wb_dat_i[31:24] ;
 end
 
 reg current_command_valid,
@@ -399,7 +402,7 @@ begin
     if ( wb_rst_i )
         output_buffer <= #1 8'h00 ;
     else if ( write_output_buffer_reg )
-        output_buffer <= #1 wb_dat_i[7:0] ;
+        output_buffer <= #1 wb_dat_i[31:24] ;
 end
 
 always@(posedge wb_clk_i or posedge wb_rst_i)
