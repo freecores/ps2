@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.7  2003/10/03 10:16:50  primozs
+// support for configurable devider added
+//
 // Revision 1.6  2003/05/28 16:26:51  simons
 // Change the address width.
 //
@@ -141,6 +144,8 @@ reg wb_reset ;
 wire [7:0] received_char ;
 wire       char_valid ;
 
+reg error ;
+
 `ifdef XILINX
     assign glbl.GSR = wb_reset ;
 `endif
@@ -164,7 +169,7 @@ ps2_keyboard_model i_ps2_mouse_model
 `endif
 
 reg ok ;
-reg error ;
+reg error1 ;
 
 reg ok_o;
 
@@ -197,6 +202,8 @@ begin
     wb_period =50;
     wb_rem    = 1'b0; 
     rem       =0;
+
+    error1 = 1'b0 ;
 
     watchdog_timer = 32'h1000_0000 ;
     watchdog_reset = 0 ;
@@ -264,8 +271,23 @@ begin
 
     end
     end
-    $display("end simulation");
-    #400 $stop ;
+    $display("\n\nstatus: Testbench done");
+    if ( error1 == 0 )
+      begin
+      $display ("report (%h)", 32'hdeaddead ) ;
+      $display ("exit (00000000)" ) ;
+      end
+    else
+      begin
+      $display ("report (%h)", 32'heeeeeeee ) ;
+      $display ("exit (00000000)" ) ;
+      end
+
+    $finish(0);
+
+
+    //$display("end simulation");
+    //
 end
 
 always
@@ -389,7 +411,8 @@ begin:main
     if ( data !== 8'h55 )
     begin
         $display("Error! Keyboard controler should respond to self test command with hard coded value 0x55! ") ;
-        #400 $stop ;
+        error1 = 1'b1 ;
+        
     end
 
     // perform self test 2
@@ -414,7 +437,8 @@ begin:main
     if ( data !== 8'h00 )
     begin
         $display("Error! Keyboard controler should respond to self test command 2 with hard coded value 0x00! ") ;
-        #400 $stop ;
+        error1 = 1'b1 ;
+        
     end
 
     kbd_write(`KBD_CNTL_REG, `KBD_CNTL_ENABLE, status);
@@ -446,7 +470,8 @@ begin:main
         if ( data !== `KBD_ACK )
         begin
             $display("Error! Expected character from keyboard was 0x%h, actualy received 0x%h!", `KBD_ACK, data ) ;
-            #400 $stop ;
+            error1 = 1'b1 ;
+            
         end
 
         // wait for keyboard to respond with BAT status
@@ -465,7 +490,8 @@ begin:main
         if ( data !== `KBD_POR )
         begin
             $display("Error! Expected character from keyboard was 0x%h, actualy received 0x%h!", `KBD_POR, data ) ;
-            #400 $stop ;
+            error1 = 1'b1 ;
+            
         end
 
         // send disable command to keyboard
@@ -490,7 +516,8 @@ begin:main
         if ( data !== `KBD_ACK )
         begin
             $display("Error! Expected character from keyboard was 0x%h, actualy received 0x%h!", `KBD_ACK, data ) ;
-            #400 $stop ;
+            error1 = 1'b1 ;
+            
         end
 
         kbd_write(`KBD_CNTL_REG, `KBD_WRITE_MODE, status);
@@ -523,7 +550,8 @@ begin:main
         if ( data !== `KBD_ACK )
         begin
             $display("Error! Expected character from keyboard was 0x%h, actualy received 0x%h!", `KBD_ACK, data ) ;
-            #400 $stop ;
+            error1 = 1'b1 ;
+            
         end
 
         // now check if command byte is as expected
@@ -546,7 +574,8 @@ begin:main
         if ( ({data, 24'h0} & (`KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC)) !== (`KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC)  )
         begin
             $display("Error! Read command byte returned wrong value!") ;
-            #400 $stop ;
+            error1 = 1'b1 ;
+            
         end
     end
     begin
@@ -554,7 +583,8 @@ begin:main
         if ( {received_char, 24'h0} !== `KBD_RESET )
         begin
             $display("Error! Keyboard received invalid character/command") ;
-            #400 $stop ;
+            error1 = 1'b1 ;
+            
         end
 
         i_ps2_keyboard_model.kbd_send_char
@@ -575,7 +605,8 @@ begin:main
         if ( {received_char,24'h0} !== `KBD_DISABLE )
         begin
             $display("Error! Keyboard received invalid character/command") ;
-            #400 $stop ;
+            error1 = 1'b1 ;
+            
         end
 
         i_ps2_keyboard_model.kbd_send_char
@@ -589,7 +620,8 @@ begin:main
         if ( {received_char,24'h0} !== `KBD_ENABLE )
         begin
             $display("Error! Keyboard received invalid character/command") ;
-            #400 $stop ;
+            error1 = 1'b1 ;
+            
         end
 
         i_ps2_keyboard_model.kbd_send_char
@@ -801,7 +833,7 @@ begin:main
     if ( read_status`CYC_ACK !== 1'b1 )
     begin
         $display("Error! Keyboard controler didn't acknowledge single read access!") ;
-        #400 $stop ;
+        
         ok_o = 0 ;
     end
     else
@@ -845,7 +877,8 @@ begin:main
     if ( read_status`CYC_ACK !== 1'b1 )
     begin
         $display("Error! Keyboard controler didn't acknowledge single read access!") ;
-        #400 $stop ;
+        error1 = 1'b1 ;
+        
         ok_o = 0 ;
     end
     else
@@ -891,7 +924,8 @@ begin:main
     if ( write_status`CYC_ACK !== 1 )
     begin
         $display("Error! Keyboard controller didn't acknowledge single write access") ;
-        #400 $stop ;
+        error1 = 1'b1 ;
+        
         ok_o = 0 ;
     end
 end
@@ -922,7 +956,8 @@ begin:main
     if ( write_status`CYC_ACK !== 1 )
     begin
         $display("Error! Keyboard controller didn't acknowledge single write access") ;
-        #400 $stop ;
+        error1 = 1'b1 ;
+        
         ok_o = 0 ;
     end
 end
@@ -1187,13 +1222,15 @@ begin:main
     if ( !( temp_data & `KBD_OBF ) )
     begin
         $display("Error! Interrupt received from keyboard controler when OBF status not set!") ;
-        #400 $stop ;
+        error1 = 1'b1 ;
+        
     end
 
     if ( temp_data & `AUX_OBUF_FULL )
     begin
         $display("Error! Interrupt received from keyboard controler when AUX_OBUF_FULL status was set!") ;
-        #400 $stop ;
+        error1 = 1'b1 ;
+        
     end
 
     read_data_reg( temp_data, ok_o ) ;
@@ -1615,7 +1652,7 @@ begin:main
     if ( !( temp_data & `AUX_OBUF_FULL ) || !(temp_data & `KBD_OBF))
     begin
         $display("Error! Interrupt b received from controler when AUX_OBF status or KBD_OBF statuses not set!") ;
-        #400 $stop ;
+        
     end
 
     wait ( ps2_test_bench.read_data_reg.in_use !== 1'b1 );
