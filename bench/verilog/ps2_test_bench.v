@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.6  2003/05/28 16:26:51  simons
+// Change the address width.
+//
 // Revision 1.5  2002/04/09 13:17:03  mihad
 // Mouse interface testcases added
 //
@@ -163,7 +166,15 @@ ps2_keyboard_model i_ps2_mouse_model
 reg ok ;
 reg error ;
 
-integer watchdog_timer ;
+reg ok_o;
+
+integer rem;
+integer wb_period;
+reg wb_rem;
+reg [15:0] wb_dev_data;
+
+
+integer    watchdog_timer ;
 reg     watchdog_reset ;
 reg     watchdog_reset_previous ;
 
@@ -176,34 +187,16 @@ reg [7:0] extended_scancode_set1_mem [0:`PS2_NUM_OF_EXTENDED_SCANCODES - 1] ;
 initial
 begin
 
+
     $readmemh("../../../bench/data/normal_scancodes_set2.hex", normal_scancode_set2_mem) ;
     $readmemh("../../../bench/data/normal_scancodes_set1.hex", normal_scancode_set1_mem) ;
     $readmemh("../../../bench/data/extended_scancodes_set2.hex", extended_scancode_set2_mem) ;
     $readmemh("../../../bench/data/extended_scancodes_set1.hex", extended_scancode_set1_mem) ;
 
-    if ( ((`PS2_TIMER_5USEC_VALUE_PP * `WB_PERIOD) < 5000) || ((`PS2_TIMER_5USEC_VALUE_PP * `WB_PERIOD) > 6000) )
-    begin
-        $display("Warning! 5us timer max value is not defined correctly regarding to WISHBONE bus clock!") ;
-        $stop ;
-    end
 
-    if ( ((`PS2_TIMER_60USEC_VALUE_PP * `WB_PERIOD) < 60000) || ((`PS2_TIMER_60USEC_VALUE_PP * `WB_PERIOD) > 61000) )
-    begin
-        $display("Warning! 60us timer max value is not defined correctly regarding to WISHBONE bus clock!") ;
-        $stop ;
-    end
-
-    if ( (1 << `PS2_TIMER_5USEC_BITS_PP) < `PS2_TIMER_5USEC_VALUE_PP )
-    begin
-        $display("Warning! 5us timer max value is not defined correctly regarding to the length in bits of 5us timer!") ;
-        $stop ;
-    end
-
-    if ( (1 << `PS2_TIMER_60USEC_BITS_PP) < `PS2_TIMER_60USEC_VALUE_PP )
-    begin
-        $display("Warning! 60us timer max value is not defined correctly regarding to the length in bits of 60us timer!") ;
-        $stop ;
-    end
+    wb_period =50;
+    wb_rem    = 1'b0; 
+    rem       =0;
 
     watchdog_timer = 32'h1000_0000 ;
     watchdog_reset = 0 ;
@@ -211,44 +204,72 @@ begin
 
     wb_clock = 1'b1 ;
     wb_reset = 1'b1 ;
-
+    
     #100 ;
 
     repeat ( 10 )
         @(posedge wb_clock) ;
+
     wb_reset <= 1'b0 ;
 
-    @(posedge wb_clock) ;
-    #1 initialize_controler ;
+    repeat(6)
 
-    test_scan_code_receiving ;
+  begin    
+   @(posedge wb_clock)  
+   begin
+   rem = 5000 % wb_period;
 
-    `ifdef PS2_AUX
-    fork
-    begin
-    `endif
-    test_normal_scancodes ;
+   if (rem > 0)
+   begin
+   wb_rem =  1'b1;
 
-    test_extended_scancodes ;
+   end
+   else
+   begin 
+   wb_rem = 1'b0;    
+ 
+   end   
+   end
+   
+   begin
+      devider_write(4'h8,5000/wb_period + wb_rem ,ok_o);
+      
 
-    test_print_screen_and_pause_scancodes ;
-    `ifdef PS2_AUX
-    stop_mouse_tests = 1'b1 ;
+      @(posedge wb_clock) ;
+      #1 initialize_controler ;
+
+      test_scan_code_receiving ;
+
+      `ifdef PS2_AUX
+      fork
+      begin
+      `endif
+      test_normal_scancodes ;
+
+      test_extended_scancodes ;
+
+      test_print_screen_and_pause_scancodes ;
+      `ifdef PS2_AUX
+      stop_mouse_tests = 1'b1 ;
+      end
+      begin
+          stop_mouse_tests = 0 ;
+          receive_mouse_movement ;
+      end
+      join
+      `endif
+
+     test_keyboard_inhibit ;
+     wb_period = wb_period + 10 ;
+
     end
-    begin
-        stop_mouse_tests = 0 ;
-        receive_mouse_movement ;
     end
-    join
-    `endif
-
-    test_keyboard_inhibit ;
-
+    $display("end simulation");
     #400 $stop ;
 end
 
 always
-    #(`WB_PERIOD / 2) wb_clock = !wb_clock ;
+    #(wb_period/2.0) wb_clock = !wb_clock ;
 
 wire wb_cyc,
      wb_stb,
@@ -270,7 +291,7 @@ i_ps2_top
     .wb_stb_i        (wb_stb),
     .wb_we_i         (wb_we),
     .wb_sel_i        (wb_sel),
-    .wb_adr_i        (wb_adr[2:0]),
+    .wb_adr_i        (wb_adr[3:0]),
     .wb_dat_i        (wb_dat_m_s),
     .wb_dat_o        (wb_dat_s_m),
     .wb_ack_o        (wb_ack),
@@ -876,6 +897,37 @@ begin:main
 end
 endtask // kbd_write
 
+task devider_write ;
+    input [31:0] address_i ;
+    input [31:16] data_i ;
+    output ok_o ;
+
+    reg `WRITE_STIM_TYPE   write_data ;
+    reg `WRITE_RETURN_TYPE write_status ;
+    reg `WB_TRANSFER_FLAGS flags ;
+begin:main
+    ok_o = 1 ;
+    flags`WB_TRANSFER_SIZE     = 1 ;
+    flags`WB_TRANSFER_AUTO_RTY = 0 ;
+    flags`WB_TRANSFER_CAB      = 0 ;
+    flags`INIT_WAITS           = 0 ;
+    flags`SUBSEQ_WAITS         = 0 ;
+
+    write_data`WRITE_ADDRESS = address_i ;
+    write_data`WRITE_DATA    = {2{data_i}};
+    write_data`WRITE_SEL     = 4'hC ;
+
+    i_wb_master.wb_single_write( write_data, flags, write_status ) ;
+
+    if ( write_status`CYC_ACK !== 1 )
+    begin
+        $display("Error! Keyboard controller didn't acknowledge single write access") ;
+        #400 $stop ;
+        ok_o = 0 ;
+    end
+end
+endtask // devider_write
+
 task test_scan_code_receiving ;
     reg ok_keyboard ;
     reg ok_controler ;
@@ -1234,6 +1286,7 @@ task test_keyboard_inhibit ;
     reg [7:0] data ;
 begin:main
     // first test, if keyboard stays inhibited after character is received, but not read from the controler
+
     i_ps2_keyboard_model.kbd_send_char
     (
         8'hE0,
@@ -1254,7 +1307,7 @@ begin:main
     end
 
     // wait 5 us to see, if keyboard is inhibited
-    #5000 ;
+    #60000 ;
 
     // now check, if clock line is low!
     if ( kbd_clk_cable !== 0 )

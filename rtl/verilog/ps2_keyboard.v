@@ -131,10 +131,12 @@ module ps2_keyboard (
   tx_write,
   tx_write_ack_o,
   tx_error_no_keyboard_ack,
-  translate
+  translate,
+  devide_reg_i
   );
 
 // Parameters
+
 
 // The timer value can be up to (2^bits) inclusive.
 parameter TIMER_60USEC_VALUE_PP = 2950; // Number of sys_clks for 60usec.
@@ -191,6 +193,8 @@ output tx_write_ack_o;
 output tx_error_no_keyboard_ack;
 input  translate ;
 
+input [15:0] devide_reg_i;
+
 reg rx_released;
 reg [7:0] rx_scan_code;
 reg rx_data_ready;
@@ -230,6 +234,14 @@ reg ps2_clk_s;        // Synchronous version of this input
 reg ps2_data_s;       // Synchronous version of this input
 reg ps2_clk_hi_z;     // Without keyboard, high Z equals 1 due to pullups.
 reg ps2_data_hi_z;    // Without keyboard, high Z equals 1 due to pullups.
+reg ps2_clk_ms;
+reg ps2_data_ms;
+
+
+reg [15:0] timer_5usec;
+reg  timer_done;
+
+
 
 //--------------------------------------------------------------------------
 // Module code
@@ -242,12 +254,16 @@ assign ps2_data_en_o_ = ps2_data_hi_z ;
 // spurious state machine transitions.
 always @(posedge clk)
 begin
-  ps2_clk_s <= ps2_clk_i;
-  ps2_data_s <= ps2_data_i;
+  ps2_clk_ms <= ps2_clk_i;
+  ps2_data_ms <= ps2_data_i;
+
+  ps2_clk_s <= ps2_clk_ms;
+  ps2_data_s <= ps2_data_ms;
+
 end
 
 // State register
-always @(posedge clk)
+always @(posedge clk or posedge reset)
 begin : m1_state_register
   if (reset) m1_state <= m1_rx_clk_h;
   else m1_state <= m1_next_state;
@@ -397,7 +413,7 @@ begin : m1_state_logic
 end
 
 // State register
-always @(posedge clk)
+always @(posedge clk or posedge reset)
 begin : m2_state_register
   if (reset) m2_state <= m2_rx_data_ready_ack;
   else m2_state <= m2_next_state;
@@ -424,11 +440,10 @@ begin : m2_state_logic
 end
 
 // This is the bit counter
-always @(posedge clk)
+always @(posedge clk or posedge reset)
 begin
-  if (   reset
-      || rx_shifting_done
-      || (m1_state == m1_tx_wait_keyboard_ack)        // After tx is done.
+  if ( reset) bit_count <= 0;
+  else if ( rx_shifting_done || (m1_state == m1_tx_wait_keyboard_ack)        // After tx is done.
       ) bit_count <= 0;  // normal reset
   else if (timer_60usec_done
            && (m1_state == m1_rx_clk_h)
@@ -453,7 +468,7 @@ assign tx_write_ack_o = (  (tx_write && (m1_state == m1_rx_clk_h))
 assign tx_parity_bit = ~^tx_data;
 
 // This is the shift register
-always @(posedge clk)
+always @(posedge clk or posedge reset)
 begin
   if (reset) q <= 0;
   else if (tx_write_ack_o) q <= {1'b1,tx_parity_bit,tx_data,1'b0};
@@ -466,9 +481,26 @@ end
 always @(posedge clk)
 begin
   if (~enable_timer_60usec) timer_60usec_count <= 0;
-  else if (~timer_60usec_done) timer_60usec_count <= timer_60usec_count + 1;
-end
-assign timer_60usec_done = (timer_60usec_count == (TIMER_60USEC_VALUE_PP - 1));
+  else if ( timer_done && !timer_60usec_done)
+         timer_60usec_count<= timer_60usec_count +1;
+  end
+assign timer_60usec_done = (timer_60usec_count == (TIMER_60USEC_VALUE_PP ));
+
+
+
+always @(posedge clk or posedge reset)
+if (reset) timer_5usec <= 1;
+else if (!enable_timer_60usec) timer_5usec <= 1;
+else if (timer_5usec == devide_reg_i) 
+ begin
+   timer_5usec <= 1;
+   timer_done  <= 1;
+  end
+else 
+  begin
+    timer_5usec<= timer_5usec +1;
+    timer_done  <= 0;
+ end
 
 // This is the 5usec timer counter
 always @(posedge clk)
@@ -476,7 +508,7 @@ begin
   if (~enable_timer_5usec) timer_5usec_count <= 0;
   else if (~timer_5usec_done) timer_5usec_count <= timer_5usec_count + 1;
 end
-assign timer_5usec_done = (timer_5usec_count == TIMER_5USEC_VALUE_PP - 1);
+assign timer_5usec_done = (timer_5usec_count == devide_reg_i -1);
 
 
 // Create the signals which indicate special scan codes received.
@@ -486,9 +518,10 @@ assign released = (q[8:1] == `RELEASE_CODE) && rx_shifting_done && translate ;
 // Store the special scan code status bits
 // Not the final output, but an intermediate storage place,
 // until the entire set of output data can be assembled.
-always @(posedge clk)
+always @(posedge clk or posedge reset)
 begin
-  if (reset || rx_output_event)
+  if (reset) hold_released <= 0;
+  else if (rx_output_event)
   begin
     hold_released <= 0;
   end
@@ -499,7 +532,7 @@ begin
 end
 
 // Output the special scan code flags, the scan code and the ascii
-always @(posedge clk)
+always @(posedge clk or posedge reset)
 begin
   if (reset)
   begin

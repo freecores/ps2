@@ -43,6 +43,10 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.4  2003/07/01 12:33:45  mihad
+// Added an option to use constant values instead of RAM
+// in the translation table.
+//
 // Revision 1.3  2003/05/28 16:26:51  simons
 // Change the address width.
 //
@@ -90,7 +94,7 @@ input wb_clk_i,
 
 input [3:0] wb_sel_i ;
 
-input [2:0]  wb_adr_i ;
+input [3:0]  wb_adr_i ;
 input [31:0] wb_dat_i ;
 
 output [31:0] wb_dat_o ;

@@ -43,6 +43,10 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.4  2003/07/01 12:34:03  mihad
+// Added an option to use constant values instead of RAM
+// in the translation table.
+//
 // Revision 1.3  2002/04/09 13:21:15  mihad
 // Added mouse interface and everything for its handling, cleaned up some unused code
 //
@@ -66,9 +70,9 @@
 `define PS2_TRANSLATION_TABLE_223_192 256'hdfdedddcdbdad9d8d7d6d5d4d3d2d1d0cfcecdcccbcac9c8c7c6c5c4c3c2c1c0
 `define PS2_TRANSLATION_TABLE_255_224 256'hfffefdfcfbfaf9f8f7f6f5f4f3f2f1f0efeeedecebeae9e8e7e6e5e4e3e2e1e0
 
-`define PS2_TIMER_60USEC_VALUE_PP 1500  // Number of sys_clks for 60usec.
-`define PS2_TIMER_60USEC_BITS_PP  11    // Number of bits needed for timer
-`define PS2_TIMER_5USEC_VALUE_PP 125    // Number of sys_clks for debounce
-`define PS2_TIMER_5USEC_BITS_PP 7       // Number of bits needed for timer
+`define PS2_TIMER_60USEC_VALUE_PP 12  // Number of sys_clks for 60usec.
+`define PS2_TIMER_60USEC_BITS_PP  4    // Number of bits needed for timer
+`define PS2_TIMER_5USEC_VALUE_PP 500    // Number of sys_clks for debounce
+`define PS2_TIMER_5USEC_BITS_PP 16       // Number of bits needed for timer
 
 //`define PS2_AUX

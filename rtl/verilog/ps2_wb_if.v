@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.6  2003/05/28 16:27:09  simons
+// Change the address width.
+//
 // Revision 1.5  2002/04/09 13:24:11  mihad
 // Added mouse interface and everything for its handling, cleaned up some unused code
 //
@@ -87,6 +90,7 @@ module ps2_wb_if
     rx_kbd_read_o,
     translate_o,
     ps2_kbd_clk_i,
+    devide_reg_o,
     inhibit_kbd_if_o
     `ifdef PS2_AUX
     ,
@@ -111,7 +115,7 @@ input wb_clk_i,
 
 input [3:0]  wb_sel_i ;
 
-input [2:0]  wb_adr_i ;
+input [3:0]  wb_adr_i ;
 
 input [31:0]  wb_dat_i ;
 
@@ -141,13 +145,18 @@ output inhibit_kbd_if_o ;
 reg [7:0] input_buffer,
           output_buffer ;
 
-reg [7:0] wb_dat_i_sampled ;
+output [15:0] devide_reg_o;
+reg    [15:0] devide_reg;
+assign        devide_reg_o = devide_reg;
+
+
+reg [15:0] wb_dat_i_sampled ;
 always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
     if ( wb_rst_i )
         wb_dat_i_sampled <= #1 0 ;
     else if ( wb_cyc_i && wb_stb_i && wb_we_i )
-        wb_dat_i_sampled <= #1 wb_dat_i[31:24] ;
+        wb_dat_i_sampled <= #1 wb_dat_i[31:16] ;
 end
 
 `ifdef PS2_AUX
@@ -192,16 +201,21 @@ wire perr                     = 1'b0 ;
 wire [7:0] status_byte = {perr, timeout, aux_input_buffer_full, kbd_inhibit, a2, system_flag, output_buffer_full || aux_output_buffer_full, input_buffer_full} ;
 
 reg  read_input_buffer_reg ;
-wire read_input_buffer = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !read_input_buffer_reg && !wb_we_i && (wb_adr_i[2:0] == 3'h0) ;
+wire read_input_buffer = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !read_input_buffer_reg && !wb_we_i && (wb_adr_i[3:0] == 4'h0) ;
 
 reg  write_output_buffer_reg ;
-wire write_output_buffer  = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !write_output_buffer_reg && wb_we_i  && (wb_adr_i[2:0] == 3'h0) ;
+wire write_output_buffer  = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !write_output_buffer_reg && wb_we_i  && (wb_adr_i[3:0] == 4'h0) ;
 
 reg  read_status_register_reg ;
-wire read_status_register = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !read_status_register_reg && !wb_we_i && (wb_adr_i[2:0] == 3'h4) ;
+wire read_status_register = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !read_status_register_reg && !wb_we_i && (wb_adr_i[3:0] == 4'h4) ;
 
 reg  send_command_reg ;
-wire send_command = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !send_command_reg && wb_we_i  && (wb_adr_i[2:0] == 3'h4) ;
+wire send_command = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !send_command_reg && wb_we_i  && (wb_adr_i[3:0] == 4'h4) ;
+
+reg  write_devide_reg ;
+wire write_devide = wb_cyc_i && wb_stb_i && wb_sel_i[3] && wb_sel_i[2] && !wb_ack_o && !write_devide_reg && wb_we_i  && (wb_adr_i[3:0] == 4'h8) ;
+reg  read_devide_reg ;
+wire read_devide = wb_cyc_i && wb_stb_i && wb_sel_i[3] && wb_sel_i[2] && !wb_ack_o && !read_devide_reg && !wb_we_i  && (wb_adr_i[3:0] == 4'h8) ;
 
 reg  translate_o,
      enable1,
@@ -212,7 +226,7 @@ reg inhibit_kbd_if_o ;
 always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
     if ( wb_rst_i )
-        inhibit_kbd_if_o <= #1 1'b1 ;
+        inhibit_kbd_if_o <= #1 1'b0 ;
     else if ( ps2_kbd_clk_i && rx_kbd_data_ready_i && !enable1)
         inhibit_kbd_if_o <= #1 1'b1 ;
     else if ( !rx_kbd_data_ready_i || enable1 )
@@ -248,6 +262,8 @@ begin
         read_input_buffer_reg    <= #1 1'b0 ;
         write_output_buffer_reg  <= #1 1'b0 ;
         read_status_register_reg <= #1 1'b0 ;
+        write_devide_reg         <= #1 1'b0 ;
+        read_devide_reg         <= #1 1'b0 ;
     end
     else
     begin
@@ -255,6 +271,8 @@ begin
         read_input_buffer_reg    <= #1 read_input_buffer ;
         write_output_buffer_reg  <= #1 write_output_buffer ;
         read_status_register_reg <= #1 read_status_register ;
+        write_devide_reg         <= #1 write_devide ;
+        read_devide_reg          <= #1 read_devide ;
     end
 end
 
@@ -263,7 +281,7 @@ begin
     if ( wb_rst_i )
         current_command <= #1 8'h0 ;
     else if ( send_command_reg )
-        current_command <= #1 wb_dat_i_sampled ;
+        current_command <= #1 wb_dat_i_sampled[15:8] ;
 end
 
 reg current_command_valid,
@@ -450,13 +468,13 @@ end
 reg [31:0] wb_dat_o ;
 wire wb_read = read_input_buffer_reg || read_status_register_reg ;
 
-wire [7:0] output_data = read_status_register_reg ? status_byte : input_buffer ;
+wire [15:0] output_data = read_status_register_reg ? {2{status_byte}} : read_devide_reg ? devide_reg : {2{input_buffer}} ;
 always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
     if ( wb_rst_i )
         wb_dat_o <= #1 32'h0 ;
     else if ( wb_read )
-        wb_dat_o <= #1 {4{output_data}} ;
+        wb_dat_o <= #1 {2{output_data}} ;
 end
 
 always@(posedge wb_clk_i or posedge wb_rst_i)
@@ -486,7 +504,15 @@ begin
     if ( wb_rst_i )
         output_buffer <= #1 8'h00 ;
     else if ( write_output_buffer_reg )
-        output_buffer <= #1 wb_dat_i_sampled ;
+        output_buffer <= #1 wb_dat_i_sampled[15:8];
+end
+
+always@(posedge wb_clk_i or posedge wb_rst_i)
+begin
+    if ( wb_rst_i )
+        devide_reg <= #1 8'h00 ;
+    else if ( write_devide_reg )
+        devide_reg <= #1 wb_dat_i_sampled ;
 end
 
 always@(posedge wb_clk_i or posedge wb_rst_i)

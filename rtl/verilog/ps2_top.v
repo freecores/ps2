@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.5  2003/06/30 15:29:27  simons
+// Error fixed again.
+//
 // Revision 1.4  2003/06/30 15:25:45  simons
 // Error fixed.
 //
@@ -104,7 +107,7 @@ input wb_clk_i,
 
 input [3:0] wb_sel_i ;
 
-input [2:0] wb_adr_i ;
+input [3:0] wb_adr_i ;
 input [31:0] wb_dat_i ;
 
 output [31:0] wb_dat_o ;
@@ -147,6 +150,8 @@ wire rx_released,
      ps2_ctrl_kbd_clk_en_,
      ps2_ctrl_kbd_clk,
      inhibit_kbd_if ;
+
+wire [15:0] devide_reg;
 
 wire [7:0] rx_scan_code,
            rx_translated_scan_code,
@@ -210,7 +215,8 @@ i_ps2_mouse
     .tx_data                     (tx_aux_data),
     .tx_write                    (tx_aux_write),
     .tx_write_ack_o              (tx_aux_write_ack),
-    .tx_error_no_ack             (tx_error_no_aux_ack)
+    .tx_error_no_ack             (tx_error_no_aux_ack),
+    .devide_reg_i                (devide_reg)
 );
 
 `endif
@@ -232,7 +238,8 @@ i_ps2_keyboard
     .tx_write                    (tx_kbd_write),
     .tx_write_ack_o              (tx_kbd_write_ack),
     .tx_error_no_keyboard_ack    (tx_error_no_keyboard_ack),
-    .translate                   (translate)
+    .translate                   (translate),
+    .devide_reg_i                (devide_reg)
 );
 
 ps2_wb_if i_ps2_wb_if
@@ -249,6 +256,8 @@ ps2_wb_if i_ps2_wb_if
     .wb_ack_o                      (wb_ack_o),
 
     .wb_int_o                      (wb_int_o),
+
+    .devide_reg_o                  (devide_reg),   
 
     .rx_scancode_i                 (rx_translated_scan_code),
     .rx_kbd_data_ready_i           (rx_translated_data_ready),

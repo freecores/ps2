@@ -129,7 +129,8 @@ module ps2_mouse (
   tx_data,
   tx_write,
   tx_write_ack_o,
-  tx_error_no_ack
+  tx_error_no_ack,
+  devide_reg_i
   );
 
 // Parameters
@@ -187,6 +188,8 @@ input tx_write;
 output tx_write_ack_o;
 output tx_error_no_ack;
 
+input [15:0] devide_reg_i;
+
 reg rx_released;
 reg [7:0] rx_scan_code;
 reg rx_data_ready;
@@ -225,6 +228,9 @@ reg ps2_data_s;       // Synchronous version of this input
 reg ps2_clk_hi_z;     // Without keyboard, high Z equals 1 due to pullups.
 reg ps2_data_hi_z;    // Without keyboard, high Z equals 1 due to pullups.
 
+reg ps2_clk_ms;
+reg ps2_data_ms;
+
 //--------------------------------------------------------------------------
 // Module code
 
@@ -236,8 +242,12 @@ assign ps2_data_en_o_ = ps2_data_hi_z ;
 // spurious state machine transitions.
 always @(posedge clk)
 begin
-  ps2_clk_s <= ps2_clk_i;
-  ps2_data_s <= ps2_data_i;
+  ps2_clk_ms <= ps2_clk_i;
+  ps2_data_ms <= ps2_data_i;
+
+  ps2_clk_s <= ps2_clk_ms;
+  ps2_data_s <= ps2_data_ms;
+
 end
 
 // State register
@@ -460,9 +470,26 @@ end
 always @(posedge clk)
 begin
   if (~enable_timer_60usec) timer_60usec_count <= 0;
-  else if (~timer_60usec_done) timer_60usec_count <= timer_60usec_count + 1;
-end
-assign timer_60usec_done = (timer_60usec_count == (TIMER_60USEC_VALUE_PP - 1));
+  else if ( timer_done && !timer_60usec_done)
+         timer_60usec_count<= timer_60usec_count +1;
+  end
+assign timer_60usec_done = (timer_60usec_count == (TIMER_60USEC_VALUE_PP ));
+
+
+
+always @(posedge clk or posedge reset)
+if (reset) timer_5usec <= 1;
+else if (!enable_timer_60usec) timer_5usec <= 1;
+else if (timer_5usec == devide_reg_i)
+ begin
+   timer_5usec <= 1;
+   timer_done  <= 1;
+  end
+else
+  begin
+    timer_5usec<= timer_5usec +1;
+    timer_done  <= 0;
+ end
 
 // This is the 5usec timer counter
 always @(posedge clk)
@@ -470,7 +497,7 @@ begin
   if (~enable_timer_5usec) timer_5usec_count <= 0;
   else if (~timer_5usec_done) timer_5usec_count <= timer_5usec_count + 1;
 end
-assign timer_5usec_done = (timer_5usec_count == TIMER_5USEC_VALUE_PP - 1);
+assign timer_5usec_done = (timer_5usec_count == devide_reg_i - 1);
 
 always @(posedge clk)
 begin

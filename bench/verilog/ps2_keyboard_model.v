@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.2  2002/04/09 13:15:16  mihad
+// Wrong acknowledge generation during receiving repaired
+//
 // Revision 1.1.1.1  2002/02/18 16:16:55  mihad
 // Initial project import - working
 //
@@ -231,5 +234,63 @@ begin:main
     end
 end
 endtask // kbd_receive_char
+
+
+time last_clk_low;
+time last_clk_diference;
+
+
+
+initial
+begin
+last_clk_low  =0;
+last_clk_diference =0;
+
+end
+
+always @(negedge kbd_clk_io)
+ 
+  begin:low_time_check
+   if (kbd_clk == 1)
+    begin 
+    last_clk_low =$time;
+    fork 
+    begin
+    #61000
+    $display(" clock low more then 61us");
+    $display("Time %t", $time) ;
+    #30000
+    $display("error clock low more then 90usec");
+    $display("Time %t", $time) ;   
+    $stop;
+    end
+    begin
+    @(posedge kbd_clk_io);
+    disable low_time_check;
+    end
+    join
+     end
+   end
+
+      
+
+ 
+always @(posedge kbd_clk_io )
+  begin 
+  if (last_clk_low >0 )
+  begin 
+  last_clk_diference = $time - last_clk_low;
+  if (last_clk_diference < 60000)
+  begin
+  $display("error time< 60u");
+  #100 $stop;
+  end
+  end
+  end
+
+
+
+
+
 
 endmodule // ps2_keyboard_model
