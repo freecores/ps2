@@ -254,19 +254,19 @@ assign ps2_data_en_o_ = ps2_data_hi_z ;
 // spurious state machine transitions.
 always @(posedge clk)
 begin
-  ps2_clk_ms <= ps2_clk_i;
-  ps2_data_ms <= ps2_data_i;
+  ps2_clk_ms <= #1 ps2_clk_i;
+  ps2_data_ms <= #1  ps2_data_i;
 
-  ps2_clk_s <= ps2_clk_ms;
-  ps2_data_s <= ps2_data_ms;
+  ps2_clk_s <= #1 ps2_clk_ms;
+  ps2_data_s <= #1 ps2_data_ms;
 
 end
 
 // State register
 always @(posedge clk or posedge reset)
 begin : m1_state_register
-  if (reset) m1_state <= m1_rx_clk_h;
-  else m1_state <= m1_next_state;
+  if (reset) m1_state <= #1 m1_rx_clk_h;
+  else m1_state <= #1 m1_next_state;
 end
 
 // State transition logic
@@ -282,65 +282,65 @@ always @(m1_state
 begin : m1_state_logic
 
   // Output signals default to this value, unless changed in a state condition.
-  ps2_clk_hi_z <= 1;
-  ps2_data_hi_z <= 1;
-  tx_error_no_keyboard_ack <= 0;
-  enable_timer_60usec <= 0;
-  enable_timer_5usec <= 0;
+  ps2_clk_hi_z <= #1 1;
+  ps2_data_hi_z <= #1 1;
+  tx_error_no_keyboard_ack <= #1 1'b0;
+  enable_timer_60usec <= #1 0;
+  enable_timer_5usec <= #1 0;
 
   case (m1_state)
 
     m1_rx_clk_h :
       begin
-        enable_timer_60usec <= 1;
-        if (tx_write) m1_next_state <= m1_tx_reset_timer;
-        else if (~ps2_clk_s) m1_next_state <= m1_rx_falling_edge_marker;
-        else m1_next_state <= m1_rx_clk_h;
+        enable_timer_60usec <= #1 1;
+        if (tx_write) m1_next_state <= #1 m1_tx_reset_timer;
+        else if (~ps2_clk_s) m1_next_state <= #1 m1_rx_falling_edge_marker;
+        else m1_next_state <= #1 m1_rx_clk_h;
       end
 
     m1_rx_falling_edge_marker :
       begin
-        enable_timer_60usec <= 0;
-        m1_next_state <= m1_rx_clk_l;
+        enable_timer_60usec <= #1 0;
+        m1_next_state <= #1 m1_rx_clk_l;
       end
 
     m1_rx_rising_edge_marker :
       begin
-        enable_timer_60usec <= 0;
-        m1_next_state <= m1_rx_clk_h;
+        enable_timer_60usec <= #1 0;
+        m1_next_state <= #1 m1_rx_clk_h;
       end
 
 
     m1_rx_clk_l :
       begin
-        enable_timer_60usec <= 1;
-        if (tx_write) m1_next_state <= m1_tx_reset_timer;
-        else if (ps2_clk_s) m1_next_state <= m1_rx_rising_edge_marker;
-        else m1_next_state <= m1_rx_clk_l;
+        enable_timer_60usec <= #1 1;
+        if (tx_write) m1_next_state <= #1 m1_tx_reset_timer;
+        else if (ps2_clk_s) m1_next_state <= #1 m1_rx_rising_edge_marker;
+        else m1_next_state <= #1 m1_rx_clk_l;
       end
 
     m1_tx_reset_timer:
       begin
-        enable_timer_60usec <= 0;
-        m1_next_state <= m1_tx_force_clk_l;
+        enable_timer_60usec <= #1 0;
+        m1_next_state <= #1 m1_tx_force_clk_l;
       end
 
     m1_tx_force_clk_l :
       begin
-        enable_timer_60usec <= 1;
-        ps2_clk_hi_z <= 0;  // Force the ps2_clk line low.
-        if (timer_60usec_done) m1_next_state <= m1_tx_first_wait_clk_h;
-        else m1_next_state <= m1_tx_force_clk_l;
+        enable_timer_60usec <= #1 1;
+        ps2_clk_hi_z <= #1 0;  // Force the ps2_clk line low.
+        if (timer_60usec_done) m1_next_state <= #1 m1_tx_first_wait_clk_h;
+        else m1_next_state <= #1 m1_tx_force_clk_l;
       end
 
     m1_tx_first_wait_clk_h :
       begin
-        enable_timer_5usec <= 1;
-        ps2_data_hi_z <= 0;        // Start bit.
+        enable_timer_5usec <= #1 1;
+        ps2_data_hi_z <= #1 0;        // Start bit.
         if (~ps2_clk_s && timer_5usec_done)
-          m1_next_state <= m1_tx_clk_l;
+          m1_next_state <= #1 m1_tx_clk_l;
         else
-          m1_next_state <= m1_tx_first_wait_clk_h;
+          m1_next_state <= #1 m1_tx_first_wait_clk_h;
       end
 
     // This state must be included because the device might possibly
@@ -350,73 +350,73 @@ begin : m1_state_logic
     // and the expected clocks would then never be generated.
     m1_tx_first_wait_clk_l :
       begin
-        ps2_data_hi_z <= 0;
-        if (~ps2_clk_s) m1_next_state <= m1_tx_clk_l;
-        else m1_next_state <= m1_tx_first_wait_clk_l;
+        ps2_data_hi_z <= #1 0;
+        if (~ps2_clk_s) m1_next_state <= #1 m1_tx_clk_l;
+        else m1_next_state <= #1 m1_tx_first_wait_clk_l;
       end
 
     m1_tx_wait_clk_h :
       begin
-        enable_timer_5usec <= 1;
-        ps2_data_hi_z <= q[0];
+        enable_timer_5usec <= #1 1;
+        ps2_data_hi_z <= #1 q[0];
         if (ps2_clk_s && timer_5usec_done)
-          m1_next_state <= m1_tx_rising_edge_marker;
+          m1_next_state <= #1 m1_tx_rising_edge_marker;
         else
-          m1_next_state <= m1_tx_wait_clk_h;
+          m1_next_state <= #1 m1_tx_wait_clk_h;
       end
 
     m1_tx_rising_edge_marker :
       begin
-        ps2_data_hi_z <= q[0];
-        m1_next_state <= m1_tx_clk_h;
+        ps2_data_hi_z <= #1 q[0];
+        m1_next_state <= #1 m1_tx_clk_h;
       end
 
     m1_tx_clk_h :
       begin
-        ps2_data_hi_z <= q[0];
-        if (tx_shifting_done) m1_next_state <= m1_tx_wait_keyboard_ack;
-        else if (~ps2_clk_s) m1_next_state <= m1_tx_clk_l;
-        else m1_next_state <= m1_tx_clk_h;
+        ps2_data_hi_z <= #1 q[0];
+        if (tx_shifting_done) m1_next_state <= #1 m1_tx_wait_keyboard_ack;
+        else if (~ps2_clk_s) m1_next_state <= #1 m1_tx_clk_l;
+        else m1_next_state <= #1 m1_tx_clk_h;
       end
 
     m1_tx_clk_l :
       begin
-        ps2_data_hi_z <= q[0];
-        if (ps2_clk_s) m1_next_state <= m1_tx_wait_clk_h;
-        else m1_next_state <= m1_tx_clk_l;
+        ps2_data_hi_z <= #1 q[0];
+        if (ps2_clk_s) m1_next_state <= #1 m1_tx_wait_clk_h;
+        else m1_next_state <= #1 m1_tx_clk_l;
       end
 
     m1_tx_wait_keyboard_ack :
       begin
         if (~ps2_clk_s && ps2_data_s)
-          m1_next_state <= m1_tx_error_no_keyboard_ack;
+          m1_next_state <= #1 m1_tx_error_no_keyboard_ack;
         else if (~ps2_clk_s && ~ps2_data_s)
-          m1_next_state <= m1_tx_done_recovery;
-        else m1_next_state <= m1_tx_wait_keyboard_ack;
+          m1_next_state <= #1 m1_tx_done_recovery;
+        else m1_next_state <= #1 m1_tx_wait_keyboard_ack;
       end
 
     m1_tx_done_recovery :
       begin
-        if (ps2_clk_s && ps2_data_s) m1_next_state <= m1_rx_clk_h;
-        else m1_next_state <= m1_tx_done_recovery;
+        if (ps2_clk_s && ps2_data_s) m1_next_state <= #1 m1_rx_clk_h;
+        else m1_next_state <= #1 m1_tx_done_recovery;
       end
 
     m1_tx_error_no_keyboard_ack :
       begin
-        tx_error_no_keyboard_ack <= 1;
-        if (ps2_clk_s && ps2_data_s) m1_next_state <= m1_rx_clk_h;
-        else m1_next_state <= m1_tx_error_no_keyboard_ack;
+        tx_error_no_keyboard_ack <= #1 1;
+        if (ps2_clk_s && ps2_data_s) m1_next_state <= #1 m1_rx_clk_h;
+        else m1_next_state <= #1 m1_tx_error_no_keyboard_ack;
       end
 
-    default : m1_next_state <= m1_rx_clk_h;
+    default : m1_next_state <= #1 m1_rx_clk_h;
   endcase
 end
 
 // State register
 always @(posedge clk or posedge reset)
 begin : m2_state_register
-  if (reset) m2_state <= m2_rx_data_ready_ack;
-  else m2_state <= m2_next_state;
+  if (reset) m2_state <= #1 m2_rx_data_ready_ack;
+  else m2_state <= #1 m2_next_state;
 end
 
 // State transition logic
@@ -425,34 +425,34 @@ begin : m2_state_logic
   case (m2_state)
     m2_rx_data_ready_ack:
           begin
-            rx_data_ready <= 1'b0;
-            if (rx_output_strobe) m2_next_state <= m2_rx_data_ready;
-            else m2_next_state <= m2_rx_data_ready_ack;
+            rx_data_ready <= #1 1'b0;
+            if (rx_output_strobe) m2_next_state <= #1 m2_rx_data_ready;
+            else m2_next_state <= #1 m2_rx_data_ready_ack;
           end
     m2_rx_data_ready:
           begin
-            rx_data_ready <= 1'b1;
-            if (rx_read) m2_next_state <= m2_rx_data_ready_ack;
-            else m2_next_state <= m2_rx_data_ready;
+            rx_data_ready <= #1 1'b1;
+            if (rx_read) m2_next_state <= #1 m2_rx_data_ready_ack;
+            else m2_next_state <= #1 m2_rx_data_ready;
           end
-    default : m2_next_state <= m2_rx_data_ready_ack;
+    default : m2_next_state <= #1 m2_rx_data_ready_ack;
   endcase
 end
 
 // This is the bit counter
 always @(posedge clk or posedge reset)
 begin
-  if ( reset) bit_count <= 0;
+  if ( reset) bit_count <= #1 0;
   else if ( rx_shifting_done || (m1_state == m1_tx_wait_keyboard_ack)        // After tx is done.
-      ) bit_count <= 0;  // normal reset
+      ) bit_count <= #1 0;  // normal reset
   else if (timer_60usec_done
            && (m1_state == m1_rx_clk_h)
            && (ps2_clk_s)
-      ) bit_count <= 0;  // rx watchdog timer reset
+      ) bit_count <= #1 0;  // rx watchdog timer reset
   else if ( (m1_state == m1_rx_falling_edge_marker)   // increment for rx
            ||(m1_state == m1_tx_rising_edge_marker)   // increment for tx
            )
-    bit_count <= bit_count + 1;
+    bit_count <= #1 bit_count + 1;
 end
 // This signal is high for one clock at the end of the timer count.
 assign rx_shifting_done = (bit_count == `TOTAL_BITS);
@@ -470,43 +470,43 @@ assign tx_parity_bit = ~^tx_data;
 // This is the shift register
 always @(posedge clk or posedge reset)
 begin
-  if (reset) q <= 0;
-  else if (tx_write_ack_o) q <= {1'b1,tx_parity_bit,tx_data,1'b0};
+  if (reset) q <= #1 0;
+  else if (tx_write_ack_o) q <= #1 {1'b1,tx_parity_bit,tx_data,1'b0};
   else if ( (m1_state == m1_rx_falling_edge_marker)
            ||(m1_state == m1_tx_rising_edge_marker) )
-    q <= {ps2_data_s,q[`TOTAL_BITS-1:1]};
+    q <= #1 {ps2_data_s,q[`TOTAL_BITS-1:1]};
 end
 
 // This is the 60usec timer counter
 always @(posedge clk)
 begin
-  if (~enable_timer_60usec) timer_60usec_count <= 0;
+  if (~enable_timer_60usec) timer_60usec_count <= #1 0;
   else if ( timer_done && !timer_60usec_done)
-         timer_60usec_count<= timer_60usec_count +1;
+         timer_60usec_count<= #1 timer_60usec_count +1;
   end
 assign timer_60usec_done = (timer_60usec_count == (TIMER_60USEC_VALUE_PP ));
 
 
 
 always @(posedge clk or posedge reset)
-if (reset) timer_5usec <= 1;
-else if (!enable_timer_60usec) timer_5usec <= 1;
+if (reset) timer_5usec <= #1 1;
+else if (!enable_timer_60usec) timer_5usec <= #1 1;
 else if (timer_5usec == devide_reg_i) 
  begin
-   timer_5usec <= 1;
-   timer_done  <= 1;
+   timer_5usec <= #1 1;
+   timer_done  <= #1 1;
   end
 else 
   begin
-    timer_5usec<= timer_5usec +1;
-    timer_done  <= 0;
+    timer_5usec<= #1 timer_5usec +1;
+    timer_done  <= #1 0;
  end
 
 // This is the 5usec timer counter
 always @(posedge clk)
 begin
-  if (~enable_timer_5usec) timer_5usec_count <= 0;
-  else if (~timer_5usec_done) timer_5usec_count <= timer_5usec_count + 1;
+  if (~enable_timer_5usec) timer_5usec_count <= #1 0;
+  else if (~timer_5usec_done) timer_5usec_count <= #1 timer_5usec_count + 1;
 end
 assign timer_5usec_done = (timer_5usec_count == devide_reg_i -1);
 
@@ -520,14 +520,14 @@ assign released = (q[8:1] == `RELEASE_CODE) && rx_shifting_done && translate ;
 // until the entire set of output data can be assembled.
 always @(posedge clk or posedge reset)
 begin
-  if (reset) hold_released <= 0;
+  if (reset) hold_released <= #1 0;
   else if (rx_output_event)
   begin
-    hold_released <= 0;
+    hold_released <= #1 0;
   end
   else
   begin
-    if (rx_shifting_done && released) hold_released <= 1;
+    if (rx_shifting_done && released) hold_released <= #1 1;
   end
 end
 
@@ -536,13 +536,13 @@ always @(posedge clk or posedge reset)
 begin
   if (reset)
   begin
-    rx_released <= 0;
-    rx_scan_code <= 0;
+    rx_released <= #1 0;
+    rx_scan_code <= #1 0;
   end
   else if (rx_output_strobe)
   begin
-    rx_released <= hold_released;
-    rx_scan_code <= q[8:1];
+    rx_released <= #1 hold_released;
+    rx_scan_code <= #1 q[8:1];
   end
 end
 
