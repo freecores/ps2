@@ -1,0 +1,130 @@
+#!/bin/csh -f
+
+#//////////////////////////////////////////////////////////////////////
+#////                                                              ////
+#////  run_ps2_sim.scr                                             ////
+#////                                                              ////
+#////  This file is part of the "ps2" project                      ////
+#////  http://www.opencores.org/cores/ps2/                         ////
+#////                                                              ////
+#////  Author(s):                                                  ////
+#////      - mihad@opencores.org                                   ////
+#////      - Miha Dolenc                                           ////
+#////                                                              ////
+#////  All additional information is avaliable in the README.txt   ////
+#////  file.                                                       ////
+#////                                                              ////
+#////                                                              ////
+#//////////////////////////////////////////////////////////////////////
+#////                                                              ////
+#//// Copyright (C) 2000 Miha Dolenc, mihad@opencores.org          ////
+#////                                                              ////
+#//// This source file may be used and distributed without         ////
+#//// restriction provided that this copyright statement is not    ////
+#//// removed from the file and that any derivative work contains  ////
+#//// the original copyright notice and the associated disclaimer. ////
+#////                                                              ////
+#//// This source file is free software; you can redistribute it   ////
+#//// and/or modify it under the terms of the GNU Lesser General   ////
+#//// Public License as published by the Free Software Foundation; ////
+#//// either version 2.1 of the License, or (at your option) any   ////
+#//// later version.                                               ////
+#////                                                              ////
+#//// This source is distributed in the hope that it will be       ////
+#//// useful, but WITHOUT ANY WARRANTY; without even the implied   ////
+#//// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR      ////
+#//// PURPOSE.  See the GNU Lesser General Public License for more ////
+#//// details.                                                     ////
+#////                                                              ////
+#//// You should have received a copy of the GNU Lesser General    ////
+#//// Public License along with this source; if not, download it   ////
+#//// from http://www.opencores.org/lgpl.shtml                     ////
+#////                                                              ////
+#//////////////////////////////////////////////////////////////////////
+#//
+#// CVS Revision History
+#//
+#// $Log: not supported by cvs2svn $
+#//
+
+echo "-MESSAGES" > ./ncvlog.args
+echo "-NOCOPYRIGHT" >> ./ncvlog.args
+echo "-CDSLIB ../bin/cds.lib" >> ./ncvlog.args
+echo "-HDLVAR ../bin/hdl.var" >> ./ncvlog.args
+echo "-INCDIR ../../../bench/verilog" >> ./ncvlog.args
+echo "-INCDIR ../../../rtl/verilog" >> ./ncvlog.args
+echo '-DEFINE "PS2_NUM_OF_NORMAL_SCANCODES 85"' >> ./ncvlog.args
+echo '-DEFINE "PS2_NUM_OF_EXTENDED_SCANCODES 38"' >> ./ncvlog.args
+
+if ( $# > 0 ) then
+    if ( $# == 1 ) then
+        switch ( $1 )
+            case xilinx:
+                echo '-DEFINE "XILINX"' >> ./ncvlog.args
+            breaksw
+
+            default:
+                echo 'Unknown option "'$1'"!'
+                exit
+            breaksw
+        endsw
+    else
+        echo "Wrong number of arguments" ; exit
+    endif
+endif
+
+echo "-LOGFILE ../log/ncvlog.log" >> ./ncvlog.args
+
+foreach filename ( `cat ../bin/rtl_file_list` )
+    echo "../../../rtl/verilog/"$filename >> ./ncvlog.args
+end
+
+foreach filename ( `cat ../bin/sim_file_list` )
+    echo "../../../bench/verilog/"$filename >> ./ncvlog.args
+end
+
+if ( $# > 0 ) then
+    switch( $1 )
+        case xilinx: 
+            foreach filename ( `cat ../bin/xilinx_file_list` ) 
+                echo "../../../../xilinx_blocks/"$filename >> ./ncvlog.args
+            end
+            breaksw
+    endsw
+endif
+
+ncvlog -f ./ncvlog.args
+
+echo "-MESSAGES" > ./ncelab.args
+echo "-NOCOPYRIGHT" >> ./ncelab.args
+echo "-CDSLIB ../bin/cds.lib" >> ./ncelab.args
+echo "-HDLVAR ../bin/hdl.var" >> ./ncelab.args
+echo "-LOGFILE ../log/ncelab.log" >> ./ncelab.args
+echo "-SNAPSHOT worklib.ps2_test_bench:rtl" >> ./ncelab.args
+echo "-ACCESS +RWC" >> ./ncelab.args
+echo "worklib.ps2_test_bench" >> ./ncelab.args
+
+if ( $# > 0 ) then
+    switch ( $1 )
+        case xilinx: 
+            echo "worklib.glbl" >> ./ncelab.args 
+        breaksw
+    endsw
+endif
+
+ncelab -f ./ncelab.args
+
+echo "-MESSAGES" > ./ncsim.args
+echo "-NOCOPYRIGHT" >> ./ncsim.args
+echo "-CDSLIB ../bin/cds.lib"  >> ./ncsim.args
+echo "-HDLVAR ../bin/hdl.var"  >> ./ncsim.args
+echo "-INPUT ./ncsim.tcl" >> ./ncsim.args
+echo "-LOGFILE ../log/ncsim.log" >> ./ncsim.args
+echo "worklib.ps2_test_bench:rtl" >> ./ncsim.args
+
+echo "database -open waves -shm -into ../out/waves.shm" > ./ncsim.tcl
+echo "probe -create -database waves ps2_test_bench -shm -all -depth all" >> ./ncsim.tcl
+echo "run"  >> ./ncsim.tcl
+echo "quit" >> ./ncsim.tcl
+
+ncsim -f ./ncsim.args
