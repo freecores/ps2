@@ -45,6 +45,9 @@
 #// CVS Revision History
 #//
 #// $Log: not supported by cvs2svn $
+#// Revision 1.2  2002/02/20 15:20:11  mihad
+#// Little/big endian changes incorporated
+#//
 #// Revision 1.1.1.1  2002/02/18 16:16:55  mihad
 #// Initial project import - working
 #//
@@ -60,22 +63,25 @@ echo '-DEFINE "PS2_NUM_OF_NORMAL_SCANCODES 85"' >> ./ncvlog.args
 echo '-DEFINE "PS2_NUM_OF_EXTENDED_SCANCODES 38"' >> ./ncvlog.args
 echo '-DEFINE "SIM"' >> ./ncvlog.args
 
-if ( $# > 0 ) then
-    if ( $# == 1 ) then
-        switch ( $1 )
-            case xilinx:
-                echo '-DEFINE "XILINX"' >> ./ncvlog.args
-            breaksw
-
-            default:
-                echo 'Unknown option "'$1'"!'
-                exit
-            breaksw
-        endsw
-    else
-        echo "Wrong number of arguments" ; exit
-    endif
-endif
+set current_par = 0
+set output_waveform = 0
+set xilinx = 0
+while ( $current_par < $# )
+    @ current_par = $current_par + 1 
+    switch ( $argv[$current_par] )
+    case xilinx:
+        echo '-DEFINE "XILINX"' >> ./ncvlog.args
+        @ xilinx = 1
+        breaksw
+    case wave:
+        @ output_waveform = 1
+        breaksw
+    default:
+        echo 'Unknown option "'$argv[$current_par]'"!'
+        exit
+        breaksw
+    endsw
+end
 
 echo "-LOGFILE ../log/ncvlog.log" >> ./ncvlog.args
 
@@ -87,14 +93,10 @@ foreach filename ( `cat ../bin/sim_file_list` )
     echo "../../../bench/verilog/"$filename >> ./ncvlog.args
 end
 
-if ( $# > 0 ) then
-    switch( $1 )
-        case xilinx: 
-            foreach filename ( `cat ../bin/xilinx_file_list` ) 
-                echo "../../../../xilinx_blocks/"$filename >> ./ncvlog.args
-            end
-            breaksw
-    endsw
+if ( $xilinx ) then
+    foreach filename ( `cat ../bin/xilinx_file_list` ) 
+        echo "../../../../xilinx_blocks/"$filename >> ./ncvlog.args
+    end
 endif
 
 ncvlog -f ./ncvlog.args
@@ -108,12 +110,8 @@ echo "-SNAPSHOT worklib.ps2_test_bench:rtl" >> ./ncelab.args
 echo "-ACCESS +RWC" >> ./ncelab.args
 echo "worklib.ps2_test_bench" >> ./ncelab.args
 
-if ( $# > 0 ) then
-    switch ( $1 )
-        case xilinx: 
-            echo "worklib.glbl" >> ./ncelab.args 
-        breaksw
-    endsw
+if ( $xilinx ) then
+    echo "worklib.glbl" >> ./ncelab.args 
 endif
 
 ncelab -f ./ncelab.args
@@ -126,9 +124,14 @@ echo "-INPUT ./ncsim.tcl" >> ./ncsim.args
 echo "-LOGFILE ../log/ncsim.log" >> ./ncsim.args
 echo "worklib.ps2_test_bench:rtl" >> ./ncsim.args
 
-echo "database -open waves -shm -into ../out/waves.shm" > ./ncsim.tcl
-echo "probe -create -database waves ps2_test_bench -shm -all -depth all" >> ./ncsim.tcl
-echo "run"  >> ./ncsim.tcl
+if ( $output_waveform ) then
+    echo "database -open waves -shm -into ../out/waves.shm" > ./ncsim.tcl
+    echo "probe -create -database waves ps2_test_bench -shm -all -depth all" >> ./ncsim.tcl
+    echo "run"  >> ./ncsim.tcl
+else
+    echo "run"  > ./ncsim.tcl
+endif
+
 echo "quit" >> ./ncsim.tcl
 
 ncsim -f ./ncsim.args

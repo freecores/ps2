@@ -43,12 +43,15 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.2  2002/02/18 16:33:08  mihad
+// Changed defines for simulation to work without xilinx primitives
+//
 // Revision 1.1.1.1  2002/02/18 16:16:56  mihad
 // Initial project import - working
 //
 //
 
-//`define PS2_RAMB4
+`define PS2_RAMB4
 `define PS2_TRANSLATION_TABLE_31_0    256'h5b03111e1f2c71665a02101d702a386559290f3e40424464583c3b3d3f4143ff
 `define PS2_TRANSLATION_TABLE_63_32   256'h5f0908162432726a5e071522233031695d061314212f39685c040512202d2e67
 `define PS2_TRANSLATION_TABLE_95_64   256'h76632b751b1c363a6e620d1a7428736d610c19272635346c600a0b181725336b
@@ -58,9 +61,11 @@
 `define PS2_TRANSLATION_TABLE_223_192 256'hdfdedddcdbdad9d8d7d6d5d4d3d2d1d0cfcecdcccbcac9c8c7c6c5c4c3c2c1c0
 `define PS2_TRANSLATION_TABLE_255_224 256'hfffefdfcfbfaf9f8f7f6f5f4f3f2f1f0efeeedecebeae9e8e7e6e5e4e3e2e1e0
 
-`define PS2_TIMER_60USEC_VALUE_PP 1920  // Number of sys_clks for 60usec.
+`define PS2_TIMER_60USEC_VALUE_PP 1500  // Number of sys_clks for 60usec.
 `define PS2_TIMER_60USEC_BITS_PP  11    // Number of bits needed for timer
-`define PS2_TIMER_5USEC_VALUE_PP 160    // Number of sys_clks for debounce
-`define PS2_TIMER_5USEC_BITS_PP 8       // Number of bits needed for timer
+`define PS2_TIMER_5USEC_VALUE_PP 125    // Number of sys_clks for debounce
+`define PS2_TIMER_5USEC_BITS_PP 7       // Number of bits needed for timer
+
+//`define PS2_AUX
 
 //`define SIM

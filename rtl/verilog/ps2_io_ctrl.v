@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.1.1.1  2002/02/18 16:16:56  mihad
+// Initial project import - working
+//
 //
 
 // synopsys translate_off
@@ -53,51 +56,51 @@ module ps2_io_ctrl
 (
     clk_i,
     rst_i,
-    ps2_ctrl_kbd_clk_en_i_,
-    ps2_ctrl_kbd_data_en_i_,
-    ps2_kbd_clk_pad_i,
-    ps2_kbd_clk_pad_oe_o,
-    ps2_kbd_data_pad_oe_o,
-    inhibit_kbd_if_i,
-    ps2_ctrl_kbd_clk_o
+    ps2_ctrl_clk_en_i_,
+    ps2_ctrl_data_en_i_,
+    ps2_clk_pad_i,
+    ps2_clk_pad_oe_o,
+    ps2_data_pad_oe_o,
+    inhibit_if_i,
+    ps2_ctrl_clk_o
 );
 
 input clk_i,
       rst_i,
-      ps2_ctrl_kbd_clk_en_i_,
-      ps2_ctrl_kbd_data_en_i_,
-      ps2_kbd_clk_pad_i,
-      inhibit_kbd_if_i ; 
+      ps2_ctrl_clk_en_i_,
+      ps2_ctrl_data_en_i_,
+      ps2_clk_pad_i,
+      inhibit_if_i ;
 
-output ps2_kbd_clk_pad_oe_o,
-       ps2_kbd_data_pad_oe_o,
-       ps2_ctrl_kbd_clk_o ;
+output ps2_clk_pad_oe_o,
+       ps2_data_pad_oe_o,
+       ps2_ctrl_clk_o ;
 
-reg    ps2_kbd_clk_pad_oe_o,
-       ps2_kbd_data_pad_oe_o ;
+reg    ps2_clk_pad_oe_o,
+       ps2_data_pad_oe_o ;
 
 always@(posedge clk_i or posedge rst_i)
 begin
     if ( rst_i )
     begin
-        ps2_kbd_clk_pad_oe_o  <= #1 1'b0 ;
-        ps2_kbd_data_pad_oe_o <= #1 1'b0 ;
+        ps2_clk_pad_oe_o  <= #1 1'b0 ;
+        ps2_data_pad_oe_o <= #1 1'b0 ;
     end
     else
     begin
-        ps2_kbd_clk_pad_oe_o  <= #1 !ps2_ctrl_kbd_clk_en_i_ || inhibit_kbd_if_i ;
-        ps2_kbd_data_pad_oe_o <= #1 !ps2_ctrl_kbd_data_en_i_ ;
+        ps2_clk_pad_oe_o  <= #1 !ps2_ctrl_clk_en_i_ || inhibit_if_i ;
+        ps2_data_pad_oe_o <= #1 !ps2_ctrl_data_en_i_ ;
     end
 end
 
-reg inhibit_kbd_if_previous ;
+reg inhibit_if_previous ;
 always@(posedge clk_i or posedge rst_i)
 begin
     if ( rst_i )
-        inhibit_kbd_if_previous <= #1 1'b1 ;
+        inhibit_if_previous <= #1 1'b1 ;
     else
-        inhibit_kbd_if_previous <= #1 inhibit_kbd_if_i ;
+        inhibit_if_previous <= #1 inhibit_if_i ;
 end
 
-assign ps2_ctrl_kbd_clk_o = ps2_kbd_clk_pad_i || ps2_kbd_clk_pad_oe_o && inhibit_kbd_if_previous ;
+assign ps2_ctrl_clk_o = ps2_clk_pad_i || ps2_clk_pad_oe_o && inhibit_if_previous ;
 endmodule // ps2_io_ctrl

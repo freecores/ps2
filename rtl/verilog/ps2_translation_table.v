@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.1.1.1  2002/02/18 16:16:56  mihad
+// Initial project import - working
+//
 //
 
 `include "ps2_defines.v"
@@ -67,7 +70,6 @@ module ps2_translation_table
     rx_translated_data_ready_o,
     rx_read_i,
     rx_read_o,
-    rx_extended_i,
     rx_released_i
 ) ;
 
@@ -90,8 +92,7 @@ input rx_data_ready_i,
 output rx_translated_data_ready_o ;
 output rx_read_o ;
 
-input  rx_extended_i,
-       rx_released_i ;
+input  rx_released_i ;
 
 wire translation_table_write_enable  = we_i && (!translate_i || !rx_data_ready_i) ;
 wire [7:0] translation_table_address = ((we_i || re_i) && (!rx_data_ready_i || !translate_i)) ? address_i : code_i ;
@@ -110,17 +111,17 @@ end
 
 `ifdef PS2_RAMB4
     `define PS2_RAM_SELECTED
-    
+
     wire [7:0] ram_out ;
     RAMB4_S8 `ifdef SIM
              #("ignore",
-               `PS2_TRANSLATION_TABLE_31_0, 
-               `PS2_TRANSLATION_TABLE_63_32, 
-               `PS2_TRANSLATION_TABLE_95_64, 
-               `PS2_TRANSLATION_TABLE_127_96, 
-               `PS2_TRANSLATION_TABLE_159_128, 
-               `PS2_TRANSLATION_TABLE_191_160, 
-               `PS2_TRANSLATION_TABLE_223_192, 
+               `PS2_TRANSLATION_TABLE_31_0,
+               `PS2_TRANSLATION_TABLE_63_32,
+               `PS2_TRANSLATION_TABLE_95_64,
+               `PS2_TRANSLATION_TABLE_127_96,
+               `PS2_TRANSLATION_TABLE_159_128,
+               `PS2_TRANSLATION_TABLE_191_160,
+               `PS2_TRANSLATION_TABLE_223_192,
                `PS2_TRANSLATION_TABLE_255_224)
               `endif
     ps2_ram
@@ -133,16 +134,16 @@ end
         .WE   (translation_table_write_enable),
         .RST  (reset_i)
     ) ;
-     
+
 `endif
 
 `ifdef PS2_RAM_SELECTED
 `else
     `define PS2_RAM_SELECTED
-    
+
     reg [7:0] ps2_ram [0:255] ;
     reg [7:0] ram_out ;
- 
+
     always@(posedge clock_i or posedge reset_i)
     begin
         if ( reset_i )
@@ -171,7 +172,7 @@ end
         end
 
         temp_init_val = `PS2_TRANSLATION_TABLE_63_32 ;
- 
+
         for ( i = 32 ; i <= 63 ; i = i + 1 )
         begin
             ps2_ram[i] = temp_init_val[7:0] ;
@@ -179,15 +180,15 @@ end
         end
 
         temp_init_val = `PS2_TRANSLATION_TABLE_95_64 ;
- 
+
         for ( i = 64 ; i <= 95 ; i = i + 1 )
         begin
             ps2_ram[i] = temp_init_val[7:0] ;
             temp_init_val = temp_init_val >> 8 ;
         end
- 
+
         temp_init_val = `PS2_TRANSLATION_TABLE_127_96 ;
- 
+
         for ( i = 96 ; i <= 127 ; i = i + 1 )
         begin
             ps2_ram[i] = temp_init_val[7:0] ;
@@ -195,31 +196,31 @@ end
         end
 
         temp_init_val = `PS2_TRANSLATION_TABLE_159_128 ;
- 
+
         for ( i = 128 ; i <= 159 ; i = i + 1 )
         begin
             ps2_ram[i] = temp_init_val[7:0] ;
             temp_init_val = temp_init_val >> 8 ;
         end
- 
+
         temp_init_val = `PS2_TRANSLATION_TABLE_191_160 ;
- 
+
         for ( i = 160 ; i <= 191 ; i = i + 1 )
         begin
             ps2_ram[i] = temp_init_val[7:0] ;
             temp_init_val = temp_init_val >> 8 ;
         end
- 
+
         temp_init_val = `PS2_TRANSLATION_TABLE_223_192 ;
- 
+
         for ( i = 192 ; i <= 223 ; i = i + 1 )
         begin
             ps2_ram[i] = temp_init_val[7:0] ;
             temp_init_val = temp_init_val >> 8 ;
         end
- 
+
         temp_init_val = `PS2_TRANSLATION_TABLE_255_224 ;
- 
+
         for ( i = 224 ; i <= 255 ; i = i + 1 )
         begin
             ps2_ram[i] = temp_init_val[7:0] ;
@@ -236,6 +237,6 @@ assign code_o = translate_i ? {(rx_released_i | ram_out[7]), ram_out[6:0]} : cod
 assign rx_translated_data_ready_o = translate_i ? rx_translated_data_ready : rx_data_ready_i ;
 assign rx_read_o = rx_read_i ;
 
-`undef PS2_RAM_SELECTED    
+`undef PS2_RAM_SELECTED
 
 endmodule //ps2_translation_table

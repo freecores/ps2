@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.4  2002/02/20 16:35:43  mihad
+// Little/big endian changes continued
+//
 // Revision 1.3  2002/02/20 15:20:10  mihad
 // Little/big endian changes incorporated
 //
@@ -70,18 +73,31 @@ module ps2_wb_if
     wb_dat_i,
     wb_dat_o,
     wb_ack_o,
- 
+
     wb_int_o,
 
-    tx_write_ack_i,
-    tx_data_o,
-    tx_write_o,
+    tx_kbd_write_ack_i,
+    tx_kbd_data_o,
+    tx_kbd_write_o,
     rx_scancode_i,
-    rx_data_ready_i,
-    rx_read_o,
+    rx_kbd_data_ready_i,
+    rx_kbd_read_o,
     translate_o,
-    ps2_clk_i,
+    ps2_kbd_clk_i,
     inhibit_kbd_if_o
+    `ifdef PS2_AUX
+    ,
+    wb_intb_o,
+
+    rx_aux_data_i,
+    rx_aux_data_ready_i,
+    rx_aux_read_o,
+    tx_aux_data_o,
+    tx_aux_write_o,
+    tx_aux_write_ack_i,
+    ps2_aux_clk_i,
+    inhibit_aux_if_o
+`endif
 ) ;
 
 input wb_clk_i,
@@ -105,38 +121,72 @@ reg wb_ack_o ;
 output wb_int_o ;
 reg    wb_int_o ;
 
-input tx_write_ack_i ;
+input tx_kbd_write_ack_i ;
 
 input [7:0] rx_scancode_i ;
-input       rx_data_ready_i ;
-output      rx_read_o ;
+input       rx_kbd_data_ready_i ;
+output      rx_kbd_read_o ;
 
-output      tx_write_o ;
-output [7:0] tx_data_o ;
+output      tx_kbd_write_o ;
+output [7:0] tx_kbd_data_o ;
 
 output translate_o ;
-input  ps2_clk_i ;
+input  ps2_kbd_clk_i ;
 
 output inhibit_kbd_if_o ;
 
 reg [7:0] input_buffer,
           output_buffer ;
 
-assign tx_data_o = output_buffer ;
+reg [7:0] wb_dat_i_sampled ;
+always@(posedge wb_clk_i or posedge wb_rst_i)
+begin
+    if ( wb_rst_i )
+        wb_dat_i_sampled <= #1 0 ;
+    else if ( wb_cyc_i && wb_stb_i && wb_we_i )
+        wb_dat_i_sampled <= #1 wb_dat_i[31:24] ;
+end
+
+`ifdef PS2_AUX
+output wb_intb_o ;
+reg    wb_intb_o ;
+
+input  [7:0]    rx_aux_data_i ;
+input           rx_aux_data_ready_i ;
+output          rx_aux_read_o ;
+output [7:0]    tx_aux_data_o ;
+output          tx_aux_write_o ;
+input           tx_aux_write_ack_i ;
+input           ps2_aux_clk_i ;
+output          inhibit_aux_if_o ;
+reg             inhibit_aux_if_o ;
+reg             aux_output_buffer_full ;
+reg             aux_input_buffer_full ;
+reg             interrupt2 ;
+reg             enable2    ;
+assign          tx_aux_data_o  = output_buffer ;
+assign          tx_aux_write_o = aux_output_buffer_full ;
+`else
+wire aux_input_buffer_full  = 1'b0 ;
+wire aux_output_buffer_full = 1'b0 ;
+wire interrupt2             = 1'b0 ;
+wire enable2                = 1'b1 ;
+`endif
+
+assign tx_kbd_data_o = output_buffer ;
 
 reg input_buffer_full,   // receive buffer
     output_buffer_full ; // transmit buffer
 
-assign tx_write_o = output_buffer_full ;
+assign tx_kbd_write_o = output_buffer_full ;
 
 wire system_flag ;
 wire a2                       = 1'b0 ;
-wire kbd_inhibit              = ps2_clk_i ;
-wire mouse_output_buffer_full = 1'b0 ;
+wire kbd_inhibit              = ps2_kbd_clk_i ;
 wire timeout                  = 1'b0 ;
 wire perr                     = 1'b0 ;
 
-wire [7:0] status_byte = {perr, timeout, mouse_output_buffer_full, kbd_inhibit, a2, system_flag, output_buffer_full, input_buffer_full} ;
+wire [7:0] status_byte = {perr, timeout, aux_input_buffer_full, kbd_inhibit, a2, system_flag, output_buffer_full || aux_output_buffer_full, input_buffer_full} ;
 
 reg  read_input_buffer_reg ;
 wire read_input_buffer = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !read_input_buffer_reg && !wb_we_i && (wb_adr_i[2:0] == 3'h0) ;
@@ -160,15 +210,25 @@ always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
     if ( wb_rst_i )
         inhibit_kbd_if_o <= #1 1'b1 ;
-    else if ( ps2_clk_i && (rx_data_ready_i || enable1) )
+    else if ( ps2_kbd_clk_i && rx_kbd_data_ready_i && !enable1)
         inhibit_kbd_if_o <= #1 1'b1 ;
-    else if ( !rx_data_ready_i && !enable1 )
+    else if ( !rx_kbd_data_ready_i || enable1 )
         inhibit_kbd_if_o <= #1 1'b0 ;
-        
+
 end
 
-wire interrupt2 = 1'b0 ;
-wire enable2    = 1'b1 ;
+`ifdef PS2_AUX
+always@(posedge wb_clk_i or posedge wb_rst_i)
+begin
+    if ( wb_rst_i )
+        inhibit_aux_if_o <= #1 1'b1 ;
+    else if ( ps2_aux_clk_i && rx_aux_data_ready_i && !enable2 )
+        inhibit_aux_if_o <= #1 1'b1 ;
+    else if ( !rx_aux_data_ready_i || enable2 )
+        inhibit_aux_if_o <= #1 1'b0 ;
+
+end
+`endif
 
 assign system_flag = system ;
 
@@ -200,7 +260,7 @@ begin
     if ( wb_rst_i )
         current_command <= #1 8'h0 ;
     else if ( send_command_reg )
-        current_command <= #1 wb_dat_i[31:24] ;
+        current_command <= #1 wb_dat_i_sampled ;
 end
 
 reg current_command_valid,
@@ -217,8 +277,8 @@ begin
         write_output_buffer_reg_previous <= #1 write_output_buffer_reg ;
 end
 
-wire invalidate_current_command = 
-     current_command_valid && 
+wire invalidate_current_command =
+     current_command_valid &&
      (( current_command_returns_value && read_input_buffer_reg && input_buffer_full) ||
       ( current_command_gets_parameter && write_output_buffer_reg_previous ) ||
       ( current_command_gets_null_terminated_string && write_output_buffer_reg_previous && (output_buffer == 8'h00) ) ||
@@ -233,7 +293,7 @@ begin
         current_command_valid <= #1 1'b0 ;
     else if ( send_command_reg )
         current_command_valid <= #1 1'b1 ;
-        
+
 end
 
 reg write_command_byte ;
@@ -241,7 +301,7 @@ reg current_command_output_valid ;
 always@(
     current_command or
     command_byte or
-    write_output_buffer_reg_previous or 
+    write_output_buffer_reg_previous or
     current_command_valid or
     output_buffer
 )
@@ -266,7 +326,7 @@ begin
                   current_command_returns_value = 1'b1 ;
                   current_command_output        = 8'h00 ;
                   current_command_output_valid  = 1'b1 ;
-              end 
+              end
         8'hA4:begin
                   current_command_returns_value = 1'b1 ;
                   current_command_output        = 8'hF1 ;
@@ -278,13 +338,17 @@ begin
         8'hA6:begin
               end
         8'hA7:begin
-              end 
+              end
         8'hA8:begin
               end
         8'hA9:begin
                   current_command_returns_value = 1'b1 ;
-                  current_command_output        = 8'h02 ; // clock line stuck high
                   current_command_output_valid  = 1'b1 ;
+                  `ifdef PS2_AUX
+                  current_command_output        = 8'h00 ;  // interface OK
+                  `else
+                  current_command_output        = 8'h02 ; // clock line stuck high
+                  `endif
               end
         8'hAA:begin
                   current_command_returns_value = 1'b1 ;
@@ -297,7 +361,7 @@ begin
                   current_command_output_valid  = 1'b1 ;
               end
         8'hAD:begin
-              end 
+              end
         8'hAE:begin
               end
         8'hAF:begin
@@ -305,7 +369,7 @@ begin
                   current_command_output        = 8'h00 ;
                   current_command_output_valid  = 1'b1 ;
               end
-        8'hC0:begin     
+        8'hC0:begin
                   current_command_returns_value = 1'b1 ;
                   current_command_output        = 8'hFF ;
                   current_command_output_valid  = 1'b1 ;
@@ -330,6 +394,11 @@ begin
               end
         8'hD3:begin
                   current_command_gets_parameter = 1'b1 ;
+                  `ifdef PS2_AUX
+                  current_command_returns_value  = 1'b1 ;
+                  current_command_output         = output_buffer ;
+                  current_command_output_valid   = write_output_buffer_reg_previous ;
+                  `endif
               end
         8'hD4:begin
                   current_command_gets_parameter = 1'b1 ;
@@ -339,7 +408,7 @@ begin
                   current_command_output        = 8'hFF ;
                   current_command_output_valid  = 1'b1 ;
               end
-    endcase    
+    endcase
 end
 
 reg cyc_i_previous ;
@@ -362,7 +431,7 @@ begin
         cyc_i_previous <= #1 wb_cyc_i ;
         stb_i_previous <= #1 wb_stb_i ;
     end
-     
+
 end
 
 always@(posedge wb_clk_i or posedge wb_rst_i)
@@ -391,18 +460,30 @@ always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
     if ( wb_rst_i )
         output_buffer_full <= #1 1'b0 ;
-    else if ( output_buffer_full && tx_write_ack_i)
-        output_buffer_full <= #1 1'b0 ; 
-    else 
+    else if ( output_buffer_full && tx_kbd_write_ack_i || enable1)
+        output_buffer_full <= #1 1'b0 ;
+    else
         output_buffer_full <= #1 write_output_buffer_reg && (!current_command_valid || (!current_command_gets_parameter && !current_command_gets_null_terminated_string)) ;
 end
+
+`ifdef PS2_AUX
+always@(posedge wb_clk_i or posedge wb_rst_i)
+begin
+    if ( wb_rst_i )
+        aux_output_buffer_full <= #1 1'b0 ;
+    else if ( aux_output_buffer_full && tx_aux_write_ack_i || enable2)
+        aux_output_buffer_full <= #1 1'b0 ;
+    else
+        aux_output_buffer_full <= #1 write_output_buffer_reg && current_command_valid && (current_command == 8'hD4) ;
+end
+`endif
 
 always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
     if ( wb_rst_i )
         output_buffer <= #1 8'h00 ;
     else if ( write_output_buffer_reg )
-        output_buffer <= #1 wb_dat_i[31:24] ;
+        output_buffer <= #1 wb_dat_i_sampled ;
 end
 
 always@(posedge wb_clk_i or posedge wb_rst_i)
@@ -412,12 +493,18 @@ begin
         translate_o <= #1 1'b0 ;
         system      <= #1 1'b0 ;
         interrupt1  <= #1 1'b0 ;
+        `ifdef PS2_AUX
+        interrupt2  <= #1 1'b0 ;
+        `endif
     end
     else if ( write_command_byte )
     begin
         translate_o <= #1 output_buffer[6] ;
         system      <= #1 output_buffer[2] ;
         interrupt1  <= #1 output_buffer[0] ;
+        `ifdef PS2_AUX
+        interrupt2  <= #1 output_buffer[1] ;
+        `endif
     end
 end
 
@@ -431,18 +518,40 @@ begin
         enable1 <= #1 1'b1 ;
     else if ( write_command_byte )
         enable1 <= #1 output_buffer[4] ;
-        
+
 end
 
-wire write_input_buffer_from_command = current_command_valid && current_command_returns_value && current_command_output_valid ;
-reg  write_input_buffer_from_command_reg ;
+`ifdef PS2_AUX
 always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
     if ( wb_rst_i )
-        write_input_buffer_from_command_reg <= #1 1'b0 ;
-    else
-        write_input_buffer_from_command_reg <= #1 write_input_buffer_from_command ;
+        enable2 <= #1 1'b1 ;
+    else if ( current_command_valid && (current_command == 8'hA8) )
+        enable2 <= #1 1'b0 ;
+    else if ( current_command_valid && (current_command == 8'hA7) )
+        enable2 <= #1 1'b1 ;
+    else if ( write_command_byte )
+        enable2 <= #1 output_buffer[5] ;
+
 end
+`endif
+
+wire write_input_buffer_from_command = current_command_valid && current_command_returns_value && current_command_output_valid ;
+wire write_input_buffer_from_kbd     = !input_buffer_full && rx_kbd_data_ready_i && !enable1 && !current_command_valid ;
+
+`ifdef PS2_AUX
+wire write_input_buffer_from_aux     = !input_buffer_full && rx_aux_data_ready_i && !enable2 && !current_command_valid && !write_input_buffer_from_kbd ;
+`endif
+
+wire load_input_buffer_value =
+    write_input_buffer_from_command
+    ||
+    write_input_buffer_from_kbd
+    `ifdef PS2_AUX
+    ||
+    write_input_buffer_from_aux
+    `endif
+    ;
 
 always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
@@ -450,9 +559,21 @@ begin
         input_buffer_full <= #1 1'b0 ;
     else if ( read_input_buffer_reg )
         input_buffer_full <= #1 1'b0 ;
-    else if ( (write_input_buffer_from_command && !write_input_buffer_from_command_reg) || (rx_data_ready_i && !enable1) )
+    else if ( load_input_buffer_value )
         input_buffer_full <= #1 1'b1 ;
 end
+
+`ifdef PS2_AUX
+always@(posedge wb_clk_i or posedge wb_rst_i)
+begin
+    if ( wb_rst_i )
+        aux_input_buffer_full <= #1 1'b0 ;
+    else if ( read_input_buffer_reg )
+        aux_input_buffer_full <= #1 1'b0 ;
+    else if ( write_input_buffer_from_aux || (write_input_buffer_from_command && (current_command == 8'hD3)) )
+        aux_input_buffer_full <= #1 1'b1 ;
+end
+`endif
 
 reg input_buffer_filled_from_command ;
 always@(posedge wb_clk_i or posedge wb_rst_i)
@@ -461,32 +582,73 @@ begin
         input_buffer_filled_from_command <= #1 1'b0 ;
     else if ( read_input_buffer_reg )
         input_buffer_filled_from_command <= #1 1'b0 ;
-    else if ( write_input_buffer_from_command && !write_input_buffer_from_command_reg)
+    else if ( write_input_buffer_from_command )
         input_buffer_filled_from_command <= #1 1'b1 ;
 end
 
-reg rx_data_ready_reg ;
-always@(posedge wb_clk_i or posedge wb_rst_i)
+`ifdef PS2_AUX
+reg [7:0] value_to_load_in_input_buffer ;
+always@
+(
+    write_input_buffer_from_command
+    or
+    current_command_output
+    or
+    rx_scancode_i
+    or
+    write_input_buffer_from_kbd
+    or
+    rx_aux_data_i
+)
 begin
-    if ( wb_rst_i )
-        rx_data_ready_reg <= #1 1'b0 ;
-    else if ( input_buffer_filled_from_command )
-        rx_data_ready_reg <= #1 1'b0 ;
-    else
-        rx_data_ready_reg <= #1 rx_data_ready_i ;
+    case ({write_input_buffer_from_command, write_input_buffer_from_kbd})
+        2'b10,
+        2'b11   :   value_to_load_in_input_buffer = current_command_output ;
+        2'b01   :   value_to_load_in_input_buffer = rx_scancode_i ;
+        2'b00   :   value_to_load_in_input_buffer = rx_aux_data_i ;
+    endcase
 end
 
-wire input_buffer_value_change = (rx_data_ready_i && !rx_data_ready_reg && !enable1) || (write_input_buffer_from_command && !write_input_buffer_from_command_reg) ;
+`else
+wire [7:0] value_to_load_in_input_buffer = write_input_buffer_from_command ? current_command_output : rx_scancode_i ;
+`endif
 
 always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
     if ( wb_rst_i )
         input_buffer <= #1 8'h00 ;
-    else if ( input_buffer_value_change )
-        input_buffer <= #1 current_command_valid && current_command_returns_value ? current_command_output : rx_scancode_i ;
+    else if ( load_input_buffer_value )
+        input_buffer <= #1 value_to_load_in_input_buffer ;
 end
 
-assign rx_read_o = enable1 || rx_data_ready_i && !input_buffer_filled_from_command && read_input_buffer_reg ;
+assign rx_kbd_read_o = rx_kbd_data_ready_i &&
+                       ( enable1
+                         ||
+                         ( read_input_buffer_reg
+                           &&
+                           input_buffer_full
+                           &&
+                           !input_buffer_filled_from_command
+                           `ifdef PS2_AUX
+                           &&
+                           !aux_input_buffer_full
+                           `endif
+                          )
+                        );
+
+`ifdef PS2_AUX
+assign rx_aux_read_o = rx_aux_data_ready_i &&
+                       ( enable2 ||
+                         ( read_input_buffer_reg
+                           &&
+                           input_buffer_full
+                           &&
+                           aux_input_buffer_full
+                           &&
+                           !input_buffer_filled_from_command
+                          )
+                        );
+`endif
 
 always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
@@ -495,7 +657,27 @@ begin
     else if ( read_input_buffer_reg || enable1 || !interrupt1)
         wb_int_o <= #1 1'b0 ;
     else
-        wb_int_o <= #1 input_buffer_full ;
+        wb_int_o <= #1 input_buffer_full
+                       `ifdef PS2_AUX
+                       &&
+                       !aux_input_buffer_full
+                       `endif
+                       ;
 end
+
+`ifdef PS2_AUX
+always@(posedge wb_clk_i or posedge wb_rst_i)
+begin
+    if ( wb_rst_i )
+        wb_intb_o <= #1 1'b0 ;
+    else if ( read_input_buffer_reg || enable2 || !interrupt2)
+        wb_intb_o <= #1 1'b0 ;
+    else
+        wb_intb_o <= #1 input_buffer_full
+                       &&
+                       aux_input_buffer_full
+                       ;
+end
+`endif
 
 endmodule // ps2_wb_if

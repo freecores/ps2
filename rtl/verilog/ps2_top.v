@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.1.1.1  2002/02/18 16:16:56  mihad
+// Initial project import - working
+//
 //
 
 `include "ps2_defines.v"
@@ -62,8 +65,8 @@ module ps2_top
     wb_dat_i,
     wb_dat_o,
     wb_ack_o,
- 
-    wb_int_o, 
+
+    wb_int_o,
 
     ps2_kbd_clk_pad_i,
     ps2_kbd_data_pad_i,
@@ -71,6 +74,17 @@ module ps2_top
     ps2_kbd_data_pad_o,
     ps2_kbd_clk_pad_oe_o,
     ps2_kbd_data_pad_oe_o
+    `ifdef PS2_AUX
+    ,
+    wb_intb_o,
+
+    ps2_aux_clk_pad_i,
+    ps2_aux_data_pad_i,
+    ps2_aux_clk_pad_o,
+    ps2_aux_data_pad_o,
+    ps2_aux_clk_pad_oe_o,
+    ps2_aux_data_pad_oe_o
+    `endif
 ) ;
 
 input wb_clk_i,
@@ -81,7 +95,7 @@ input wb_clk_i,
 
 input [3:0] wb_sel_i ;
 
-input [31:0]wb_adr_i, 
+input [31:0]wb_adr_i,
             wb_dat_i ;
 
 output [31:0] wb_dat_o ;
@@ -98,43 +112,101 @@ output ps2_kbd_clk_pad_o,
        ps2_kbd_clk_pad_oe_o,
        ps2_kbd_data_pad_oe_o ;
 
-wire rx_extended,
-     rx_released,
-     rx_shift_key_on,
-     rx_data_ready,
+`ifdef PS2_AUX
+output wb_intb_o ;
+input ps2_aux_clk_pad_i,
+      ps2_aux_data_pad_i ;
+
+output ps2_aux_clk_pad_o,
+       ps2_aux_data_pad_o,
+       ps2_aux_clk_pad_oe_o,
+       ps2_aux_data_pad_oe_o ;
+
+assign ps2_aux_clk_pad_o  = 1'b0 ;
+assign ps2_aux_data_pad_o = 1'b0 ;
+`endif
+
+wire rx_released,
+     rx_kbd_data_ready,
      rx_translated_data_ready,
-     rx_read_wb,
-     rx_read_tt,
-     tx_write,
-     tx_write_ack,
+     rx_kbd_read_wb,
+     rx_kbd_read_tt,
+     tx_kbd_write,
+     tx_kbd_write_ack,
      tx_error_no_keyboard_ack,
      ps2_ctrl_kbd_data_en_,
      ps2_ctrl_kbd_clk_en_,
      ps2_ctrl_kbd_clk,
      inhibit_kbd_if ;
 
-wire [7:0] rx_scan_code, 
+wire [7:0] rx_scan_code,
            rx_translated_scan_code,
-           rx_ascii,
-           tx_data ;
+           tx_kbd_data ;
 
 assign ps2_kbd_clk_pad_o  = 1'b0 ;
 assign ps2_kbd_data_pad_o = 1'b0 ;
 
-ps2_io_ctrl i_ps2_io_ctrl
+ps2_io_ctrl i_ps2_io_ctrl_keyboard
 (
-    .clk_i                   (wb_clk_i),
-    .rst_i                   (wb_rst_i),
-    .ps2_ctrl_kbd_clk_en_i_  (ps2_ctrl_kbd_clk_en_),
-    .ps2_ctrl_kbd_data_en_i_ (ps2_ctrl_kbd_data_en_),
-    .ps2_kbd_clk_pad_i       (ps2_kbd_clk_pad_i),
-    .ps2_kbd_clk_pad_oe_o    (ps2_kbd_clk_pad_oe_o),
-    .ps2_kbd_data_pad_oe_o   (ps2_kbd_data_pad_oe_o),
-    .inhibit_kbd_if_i        (inhibit_kbd_if),
-    .ps2_ctrl_kbd_clk_o      (ps2_ctrl_kbd_clk)
+    .clk_i               (wb_clk_i),
+    .rst_i               (wb_rst_i),
+    .ps2_ctrl_clk_en_i_  (ps2_ctrl_kbd_clk_en_),
+    .ps2_ctrl_data_en_i_ (ps2_ctrl_kbd_data_en_),
+    .ps2_clk_pad_i       (ps2_kbd_clk_pad_i),
+    .ps2_clk_pad_oe_o    (ps2_kbd_clk_pad_oe_o),
+    .ps2_data_pad_oe_o   (ps2_kbd_data_pad_oe_o),
+    .inhibit_if_i        (inhibit_kbd_if),
+    .ps2_ctrl_clk_o      (ps2_ctrl_kbd_clk)
 );
 
-ps2_keyboard #(`PS2_TIMER_60USEC_VALUE_PP, `PS2_TIMER_60USEC_BITS_PP, `PS2_TIMER_5USEC_VALUE_PP, `PS2_TIMER_5USEC_BITS_PP, 0)
+`ifdef PS2_AUX
+wire rx_aux_data_ready,
+     rx_aux_read,
+     tx_aux_write,
+     tx_aux_write_ack,
+     tx_error_no_aux_ack,
+     ps2_ctrl_aux_data_en_,
+     ps2_ctrl_aux_clk_en_,
+     ps2_ctrl_aux_clk,
+     inhibit_aux_if ;
+
+wire [7:0] rx_aux_data,
+           tx_aux_data ;
+
+ps2_io_ctrl i_ps2_io_ctrl_auxiliary
+(
+    .clk_i               (wb_clk_i),
+    .rst_i               (wb_rst_i),
+    .ps2_ctrl_clk_en_i_  (ps2_ctrl_aux_clk_en_),
+    .ps2_ctrl_data_en_i_ (ps2_ctrl_aux_data_en_),
+    .ps2_clk_pad_i       (ps2_aux_clk_pad_i),
+    .ps2_clk_pad_oe_o    (ps2_aux_clk_pad_oe_o),
+    .ps2_data_pad_oe_o   (ps2_aux_data_pad_oe_o),
+    .inhibit_if_i        (inhibit_aux_if),
+    .ps2_ctrl_clk_o      (ps2_ctrl_aux_clk)
+);
+
+ps2_mouse #(`PS2_TIMER_60USEC_VALUE_PP, `PS2_TIMER_60USEC_BITS_PP, `PS2_TIMER_5USEC_VALUE_PP, `PS2_TIMER_5USEC_BITS_PP)
+i_ps2_mouse
+(
+    .clk                         (wb_clk_i),
+    .reset                       (wb_rst_i),
+    .ps2_clk_en_o_               (ps2_ctrl_aux_clk_en_),
+    .ps2_data_en_o_              (ps2_ctrl_aux_data_en_),
+    .ps2_clk_i                   (ps2_ctrl_aux_clk),
+    .ps2_data_i                  (ps2_aux_data_pad_i),
+    .rx_scan_code                (rx_aux_data),
+    .rx_data_ready               (rx_aux_data_ready),
+    .rx_read                     (rx_aux_read),
+    .tx_data                     (tx_aux_data),
+    .tx_write                    (tx_aux_write),
+    .tx_write_ack_o              (tx_aux_write_ack),
+    .tx_error_no_ack             (tx_error_no_aux_ack)
+);
+
+`endif
+
+ps2_keyboard #(`PS2_TIMER_60USEC_VALUE_PP, `PS2_TIMER_60USEC_BITS_PP, `PS2_TIMER_5USEC_VALUE_PP, `PS2_TIMER_5USEC_BITS_PP)
 i_ps2_keyboard
 (
     .clk                         (wb_clk_i),
@@ -143,16 +215,13 @@ i_ps2_keyboard
     .ps2_data_en_o_              (ps2_ctrl_kbd_data_en_),
     .ps2_clk_i                   (ps2_ctrl_kbd_clk),
     .ps2_data_i                  (ps2_kbd_data_pad_i),
-    .rx_extended                 (rx_extended),
     .rx_released                 (rx_released),
-    .rx_shift_key_on             (rx_shift_key_on),
     .rx_scan_code                (rx_scan_code),
-    .rx_ascii                    (rx_ascii),
-    .rx_data_ready               (rx_data_ready),
-    .rx_read                     (rx_read_tt),
-    .tx_data                     (tx_data),
-    .tx_write                    (tx_write),
-    .tx_write_ack_o              (tx_write_ack),
+    .rx_data_ready               (rx_kbd_data_ready),
+    .rx_read                     (rx_kbd_read_tt),
+    .tx_data                     (tx_kbd_data),
+    .tx_write                    (tx_kbd_write),
+    .tx_write_ack_o              (tx_kbd_write_ack),
     .tx_error_no_keyboard_ack    (tx_error_no_keyboard_ack),
     .translate                   (translate)
 );
@@ -169,18 +238,31 @@ ps2_wb_if i_ps2_wb_if
     .wb_dat_i                      (wb_dat_i),
     .wb_dat_o                      (wb_dat_o),
     .wb_ack_o                      (wb_ack_o),
- 
+
     .wb_int_o                      (wb_int_o),
- 
+
     .rx_scancode_i                 (rx_translated_scan_code),
-    .rx_data_ready_i               (rx_translated_data_ready),
-    .rx_read_o                     (rx_read_wb),
-    .tx_data_o                     (tx_data),
-    .tx_write_o                    (tx_write),
-    .tx_write_ack_i                (tx_write_ack),
+    .rx_kbd_data_ready_i           (rx_translated_data_ready),
+    .rx_kbd_read_o                 (rx_kbd_read_wb),
+    .tx_kbd_data_o                 (tx_kbd_data),
+    .tx_kbd_write_o                (tx_kbd_write),
+    .tx_kbd_write_ack_i            (tx_kbd_write_ack),
     .translate_o                   (translate),
-    .ps2_clk_i                     (ps2_kbd_clk_pad_i),
+    .ps2_kbd_clk_i                 (ps2_kbd_clk_pad_i),
     .inhibit_kbd_if_o              (inhibit_kbd_if)
+    `ifdef PS2_AUX
+    ,
+    .wb_intb_o                     (wb_intb_o),
+
+    .rx_aux_data_i                 (rx_aux_data),
+    .rx_aux_data_ready_i           (rx_aux_data_ready),
+    .rx_aux_read_o                 (rx_aux_read),
+    .tx_aux_data_o                 (tx_aux_data),
+    .tx_aux_write_o                (tx_aux_write),
+    .tx_aux_write_ack_i            (tx_aux_write_ack),
+    .ps2_aux_clk_i                 (ps2_aux_clk_pad_i),
+    .inhibit_aux_if_o              (inhibit_aux_if)
+    `endif
 ) ;
 
 ps2_translation_table i_ps2_translation_table
@@ -195,12 +277,11 @@ ps2_translation_table i_ps2_translation_table
     .we_i                       (1'b0),
     .re_i                       (1'b0),
     .data_o                     (),
-    .rx_data_ready_i            (rx_data_ready),
+    .rx_data_ready_i            (rx_kbd_data_ready),
     .rx_translated_data_ready_o (rx_translated_data_ready),
-    .rx_read_i                  (rx_read_wb),
-    .rx_read_o                  (rx_read_tt),
-    .rx_released_i              (rx_released),
-    .rx_extended_i              (rx_extended)
+    .rx_read_i                  (rx_kbd_read_wb),
+    .rx_read_o                  (rx_kbd_read_tt),
+    .rx_released_i              (rx_released)
 ) ;
 
 endmodule // ps2_top
