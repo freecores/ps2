@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.1.1.1  2002/02/18 16:16:55  mihad
+// Initial project import - working
+//
 //
 
 `include "timescale.v"
@@ -165,14 +168,15 @@ task kbd_receive_char;
     output [7:0] char ;
     reg          parity ;
     integer i ;
-    reg          stop_bit_received ;
+    reg          stop_clocking ;
 begin:main
     i = 0 ;
-    stop_bit_received = 1 ;
     receiving = 1 ;
+    stop_clocking = 1'b0 ;
+
     #(kbd_clk_period/2) ;
 
-    while ( i < 11 )
+    while ( !stop_clocking )
     begin
 
         if ( !kbd_clk_io )
@@ -197,28 +201,20 @@ begin:main
                 if ( parity !== ( !(^char) ) )
                     $display("Invalid parity bit received") ;
             end
-            else
-            begin
-                if ( kbd_data_io !== 1'b1 )
-                begin
-                    i = i - 1 ;
-                    stop_bit_received = 0 ;
-                end
-                else
-                begin
-                    kbd_data = 1'b0 ;
-                end
-            end
         end
 
         i = i + 1 ;
-        #(kbd_clk_period/2) ;
-    end
+        #(kbd_clk_period/4) ;
+        if ( i > 9 )
+        begin
+            if ( kbd_data_io === 1'b1 )
+            begin
+                kbd_data <= 1'b0 ;
+                stop_clocking = 1'b1 ;
+            end
+        end
 
-    if ( !kbd_clk_io )
-    begin
-        receiving = 0 ;
-        disable main ;
+        #(kbd_clk_period/4) ;
     end
 
     kbd_clk  = 1'b0 ;
@@ -227,12 +223,12 @@ begin:main
     kbd_clk  <= 1'b1 ;
     kbd_data <= 1'b1 ;
 
-    if ( stop_bit_received )
+    receiving = 0 ;
+
+    if ( i === 10 )
     begin
         char_valid_o = !char_valid_o ;
     end
-
-    receiving = 0 ;
 end
 endtask // kbd_receive_char
 
