@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.4  2003/06/30 15:25:45  simons
+// Error fixed.
+//
 // Revision 1.3  2003/05/28 16:27:09  simons
 // Change the address width.
 //
@@ -101,7 +104,7 @@ input wb_clk_i,
 
 input [3:0] wb_sel_i ;
 
-input [2:0] wb_adr_i,
+input [2:0] wb_adr_i ;
 input [31:0] wb_dat_i ;
 
 output [31:0] wb_dat_o ;
