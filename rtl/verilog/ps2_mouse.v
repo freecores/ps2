@@ -198,7 +198,8 @@ reg tx_error_no_ack;
 // Internal signal declarations
 wire timer_60usec_done;
 wire timer_5usec_done;
-
+reg timer_done ;
+reg timer_5usec ;
                          // NOTE: These two signals used to be one.  They
                          //       were split into two signals because of
                          //       shift key trapping.  With shift key
