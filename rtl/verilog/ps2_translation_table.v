@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.2  2002/04/09 13:21:15  mihad
+// Added mouse interface and everything for its handling, cleaned up some unused code
+//
 // Revision 1.1.1.1  2002/02/18 16:16:56  mihad
 // Initial project import - working
 //
@@ -113,7 +116,8 @@ end
     `define PS2_RAM_SELECTED
 
     wire [7:0] ram_out ;
-    RAMB4_S8 `ifdef SIM
+    RAMB4_S8 
+             `ifdef SIM
              #("ignore",
                `PS2_TRANSLATION_TABLE_31_0,
                `PS2_TRANSLATION_TABLE_63_32,

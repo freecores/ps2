@@ -111,7 +111,6 @@
 
 
 // synopsys translate_off
-`resetall
 `include "timescale.v"
 // synopsys translate_on
 `define TOTAL_BITS   11
