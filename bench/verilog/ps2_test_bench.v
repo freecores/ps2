@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.1.1.1  2002/02/18 16:16:55  mihad
+// Initial project import - working
+//
 //
 
 `include "timescale.v"
@@ -1104,6 +1107,26 @@ begin:main
         end
     end
     join
+
+    // do D2 command, that copies parameter in input buffer to output buffer
+    kbd_write( `KBD_CNTL_REG, 32'hD2, ok_controler ) ;
+    if ( ok_controler !== 1 )
+        disable main ;
+
+    kbd_write(`KBD_DATA_REG, 32'h5555_5555, ok_controler) ;
+
+    if ( ok_controler !== 1 )
+        disable main ;
+
+    return_scan_code_on_irq( data, ok_controler ) ;
+    if ( ok_controler !== 1 )
+        disable main ;
+
+    if ( data !== 8'h55 ) 
+    begin
+        $display("Error! D2 command doesn't work properly") ;
+    end
+
 end
 endtask // test_keyboard_inhibit
 

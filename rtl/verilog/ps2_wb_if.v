@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.1.1.1  2002/02/18 16:16:56  mihad
+// Initial project import - working
+//
 //
 
 // synopsys translate_off
@@ -314,6 +317,7 @@ begin
                   current_command_gets_parameter = 1'b1 ;
               end
         8'hD2:begin
+                  current_command_returns_value   = 1'b1 ;
                   current_command_gets_parameter  = 1'b1 ;
                   current_command_output          = output_buffer ;
                   current_command_output_valid    = write_output_buffer_reg_previous ;
