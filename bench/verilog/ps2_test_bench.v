@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.4  2002/02/20 16:35:34  mihad
+// Little/big endian changes continued
+//
 // Revision 1.3  2002/02/20 15:20:02  mihad
 // Little/big endian changes incorporated
 //
@@ -95,6 +98,20 @@
 `define KBD_DMS             32'h20_00_00_00
 `define KBD_KCC             32'h40_00_00_00
 `define KBD_DISABLE_COMMAND 32'h10_00_00_00
+`define AUX_OBUF_FULL       8'h20               /* output buffer (from device) full */
+`define AUX_INTERRUPT_ON    32'h02_000000       /* enable controller interrupts */
+
+`ifdef PS2_AUX
+`define AUX_ENABLE      32'ha8_000000       /* enable aux */
+`define AUX_DISABLE	    32'ha7_000000       /* disable aux */
+`define AUX_MAGIC_WRITE 32'hd4_000000       /* value to send aux device data */
+`define AUX_SET_SAMPLE  32'hf3_000000       /* set sample rate */
+`define AUX_SET_RES     32'he8_000000       /* set resolution */
+`define AUX_SET_SCALE21 32'he7_000000       /* set 2:1 scaling */
+`define AUX_INTS_OFF    32'h65_000000       /* disable controller interrupts */
+`define AUX_INTS_ON     32'h47_000000       /* enable controller interrupts */
+`define AUX_ENABLE_DEV  32'hf4_000000       /* enable aux device */
+`endif
 
 module ps2_test_bench() ;
 
@@ -104,6 +121,13 @@ wire kbd_data_cable ;
 
 pullup(kbd_clk_cable)  ;
 pullup(kbd_data_cable) ;
+
+`ifdef PS2_AUX
+pullup(aux_clk_cable)  ;
+pullup(aux_data_cable) ;
+wire   wb_intb ;
+reg    stop_mouse_tests ;
+`endif
 
 reg wb_clock ;
 reg wb_reset ;
@@ -121,6 +145,17 @@ ps2_keyboard_model i_ps2_keyboard_model
     .last_char_received_o (received_char),
     .char_valid_o (char_valid)
 ) ;
+
+`ifdef PS2_AUX
+wire [7:0] aux_received_char ;
+ps2_keyboard_model i_ps2_mouse_model
+(
+    .kbd_clk_io  (aux_clk_cable),
+    .kbd_data_io (aux_data_cable),
+    .last_char_received_o (aux_received_char),
+    .char_valid_o (aux_char_valid)
+) ;
+`endif
 
 reg ok ;
 reg error ;
@@ -185,11 +220,24 @@ begin
 
     test_scan_code_receiving ;
 
+    `ifdef PS2_AUX
+    fork
+    begin
+    `endif
     test_normal_scancodes ;
-  
+
     test_extended_scancodes ;
 
     test_print_screen_and_pause_scancodes ;
+    `ifdef PS2_AUX
+    stop_mouse_tests = 1'b1 ;
+    end
+    begin
+        stop_mouse_tests = 0 ;
+        receive_mouse_movement ;
+    end
+    join
+    `endif
 
     test_keyboard_inhibit ;
 
@@ -209,8 +257,8 @@ wire wb_cyc,
 wire [3:0] wb_sel ;
 
 wire [31:0] wb_adr, wb_dat_m_s, wb_dat_s_m ;
-     
-ps2_sim_top 
+
+ps2_sim_top
 i_ps2_top
 (
     .wb_clk_i        (wb_clock),
@@ -223,11 +271,18 @@ i_ps2_top
     .wb_dat_i        (wb_dat_m_s),
     .wb_dat_o        (wb_dat_s_m),
     .wb_ack_o        (wb_ack),
- 
+
     .wb_int_o        (wb_int),
- 
+
     .ps2_kbd_clk_io  (kbd_clk_cable),
     .ps2_kbd_data_io (kbd_data_cable)
+    `ifdef PS2_AUX
+    ,
+    .wb_intb_o(wb_intb),
+
+    .ps2_aux_clk_io(aux_clk_cable),
+    .ps2_aux_data_io(aux_data_cable)
+    `endif
 ) ;
 
 WB_MASTER_BEHAVIORAL i_wb_master
@@ -255,124 +310,134 @@ begin
     begin
         $display("Warning! Simulation watchdog timer has expired!") ;
         watchdog_timer = 32'hFFFF_FFFF ;
-    end 
+    end
     else if ( watchdog_reset !== watchdog_reset_previous )
         watchdog_timer = 32'hFFFF_FFFF ;
 
     watchdog_reset_previous = watchdog_reset ;
-    
+
 end
 
 task initialize_controler ;
     reg [7:0] data ;
     reg status ;
 begin:main
-    
-    // simulate keyboard driver's behaviour 
-    read_status_reg(data, status) ;
-    if ( status !== 1 )
-        disable main ;
 
-    if ( data & `KBD_OBF )
-        read_data_reg(data, status) ;
+    // simulate keyboard driver's behaviour
+    data   = `KBD_OBF ;
+    status = 1 ;
+    while ( data & `KBD_OBF )
+    begin
+        read_status_reg(data, status) ;
+        if ( status !== 1 )
+            #1 disable main ;
 
-    if ( status !== 1 )
-        disable main ;
+        if ( data & `KBD_OBF )
+        begin
+            read_data_reg(data, status) ;
+            data = `KBD_OBF ;
+        end
+
+        if ( status !== 1 )
+            #1 disable main ;
+
+    end
 
     kbd_write(`KBD_CNTL_REG, `KBD_SELF_TEST, status) ;
 
     if ( status !== 1 )
-        disable main ;
+        #1 disable main ;
 
     // command sent - wait for commands output to be ready
     data = 0 ;
-    while( status && !( data & `KBD_OBF ) )
+    while( !( data & `KBD_OBF ) )
+    begin
         read_status_reg(data, status) ;
+        if ( status !== 1 )
+            #1 disable main ;
+    end
 
-    if ( status !== 1 )
-        disable main ;
-  
     read_data_reg( data, status ) ;
 
     if ( status !== 1 )
-        disable main ; 
+        #1 disable main ;
 
     if ( data !== 8'h55 )
     begin
         $display("Error! Keyboard controler should respond to self test command with hard coded value 0x55! ") ;
         #400 $stop ;
-    end  
+    end
 
     // perform self test 2
     kbd_write(`KBD_CNTL_REG, `KBD_SELF_TEST2, status) ;
- 
+
     if ( status !== 1 )
-        disable main ;
- 
+        #1 disable main ;
+
     // command sent - wait for commands output to be ready
     data = 0 ;
     while( status && !( data & `KBD_OBF ) )
         read_status_reg(data, status) ;
- 
+
     if ( status !== 1 )
-        disable main ;
- 
+        #1 disable main ;
+
     read_data_reg( data, status ) ;
- 
+
     if ( status !== 1 )
-        disable main ;
- 
+        #1 disable main ;
+
     if ( data !== 8'h00 )
     begin
         $display("Error! Keyboard controler should respond to self test command 2 with hard coded value 0x00! ") ;
         #400 $stop ;
     end
-    
+
     kbd_write(`KBD_CNTL_REG, `KBD_CNTL_ENABLE, status);
- 
+
     if ( status !== 1 )
-        disable main ; 
+        #1 disable main ;
 
     // send reset command to keyboard
     kbd_write(`KBD_DATA_REG, `KBD_RESET, status) ;
 
     if ( status !== 1 )
-        disable main ;
+        #1 disable main ;
 
-    fork 
+    fork
     begin
         // wait for keyboard to respond with acknowledge
         data = 0 ;
         while( status && !( data & `KBD_OBF ) )
             read_status_reg(data, status) ;
- 
+
         if ( status !== 1 )
-            disable main ;
- 
+            #1 disable main ;
+
         read_data_reg( data, status ) ;
- 
+
         if ( status !== 1 )
-            disable main ;
- 
+            #1 disable main ;
+
         if ( data !== `KBD_ACK )
         begin
             $display("Error! Expected character from keyboard was 0x%h, actualy received 0x%h!", `KBD_ACK, data ) ;
             #400 $stop ;
-        end 
+        end
 
         // wait for keyboard to respond with BAT status
         data = 0 ;
         while( status && !( data & `KBD_OBF ) )
             read_status_reg(data, status) ;
- 
+
         if ( status !== 1 )
-            disable main ;
- 
+            #1 disable main ;
+
         read_data_reg( data, status ) ;
- 
+
         if ( status !== 1 )
-            disable main ;
- 
+            #1 disable main ;
+
         if ( data !== `KBD_POR )
         begin
             $display("Error! Expected character from keyboard was 0x%h, actualy received 0x%h!", `KBD_POR, data ) ;
@@ -381,78 +446,78 @@ begin:main
 
         // send disable command to keyboard
         kbd_write(`KBD_DATA_REG, `KBD_DISABLE, status) ;
- 
+
         if ( status !== 1 )
-            disable main ;
+            #1 disable main ;
 
         // wait for keyboard to respond with acknowledge
         data = 0 ;
         while( status && !( data & `KBD_OBF ) )
             read_status_reg(data, status) ;
- 
+
         if ( status !== 1 )
-            disable main ;
- 
+            #1 disable main ;
+
         read_data_reg( data, status ) ;
- 
+
         if ( status !== 1 )
-            disable main ;
- 
+            #1 disable main ;
+
         if ( data !== `KBD_ACK )
         begin
             $display("Error! Expected character from keyboard was 0x%h, actualy received 0x%h!", `KBD_ACK, data ) ;
             #400 $stop ;
         end
-                       
+
         kbd_write(`KBD_CNTL_REG, `KBD_WRITE_MODE, status);
         if ( status !== 1 )
-            disable main ;
- 
+            #1 disable main ;
+
         kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC, status);
         if ( status !== 1 )
-            disable main ;
+            #1 disable main ;
 
         // send disable command to keyboard
         kbd_write(`KBD_DATA_REG, `KBD_ENABLE, status) ;
- 
+
         if ( status !== 1 )
-            disable main ;
- 
+            #1 disable main ;
+
         // wait for keyboard to respond with acknowledge
         data = 0 ;
         while( status && !( data & `KBD_OBF ) )
             read_status_reg(data, status) ;
- 
+
         if ( status !== 1 )
-            disable main ;
- 
+            #1 disable main ;
+
         read_data_reg( data, status ) ;
- 
+
         if ( status !== 1 )
-            disable main ;
- 
+            #1 disable main ;
+
         if ( data !== `KBD_ACK )
         begin
             $display("Error! Expected character from keyboard was 0x%h, actualy received 0x%h!", `KBD_ACK, data ) ;
             #400 $stop ;
-        end 
+        end
 
         // now check if command byte is as expected
         kbd_write(`KBD_CNTL_REG, `KBD_READ_MODE, status);
         if ( status !== 1 )
-            disable main ;
+            #1 disable main ;
 
         data = 0 ;
         while( status && !( data & `KBD_OBF ) )
             read_status_reg(data, status) ;
 
         if ( status !== 1 )
-            disable main ;
+            #1 disable main ;
 
         read_data_reg(data, status) ;
 
         if ( status !== 1 )
-            disable main ;
+            #1 disable main ;
 
         if ( ({data, 24'h0} & (`KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC)) !== (`KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC)  )
         begin
@@ -465,15 +530,15 @@ begin:main
         if ( {received_char, 24'h0} !== `KBD_RESET )
         begin
             $display("Error! Keyboard received invalid character/command") ;
-            #400 $stop ; 
+            #400 $stop ;
         end
 
         i_ps2_keyboard_model.kbd_send_char
         (
-            `KBD_ACK, 
+            `KBD_ACK,
             ok,
             error
-        ) ;    
+        ) ;
 
         i_ps2_keyboard_model.kbd_send_char
         (
@@ -488,13 +553,13 @@ begin:main
             $display("Error! Keyboard received invalid character/command") ;
             #400 $stop ;
         end
- 
+
         i_ps2_keyboard_model.kbd_send_char
         (
             `KBD_ACK,
             ok,
             error
-        ) ; 
+        ) ;
 
         @(char_valid) ;
         if ( {received_char,24'h0} !== `KBD_ENABLE )
@@ -502,21 +567,182 @@ begin:main
             $display("Error! Keyboard received invalid character/command") ;
             #400 $stop ;
         end
- 
+
         i_ps2_keyboard_model.kbd_send_char
         (
             `KBD_ACK,
             ok,
             error
         ) ;
-        
+
     end
     join
 
     watchdog_reset = !watchdog_reset ;
 
+    `ifdef PS2_AUX
+    kbd_write(`KBD_CNTL_REG, `AUX_ENABLE, status) ;
+
+    if ( status !== 1 )
+        #1 disable main ;
+
+    // simulate aux driver's behaviour
+    data   = 1 ;
+    status = 1 ;
+
+    kbd_write(`KBD_CNTL_REG, `AUX_MAGIC_WRITE, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    data = 1 ;
+
+    kbd_write(`KBD_DATA_REG, `AUX_SET_SAMPLE, status) ;
+
+    if ( status !== 1 )
+        #1 disable main ;
+
+    @(aux_char_valid) ;
+    if ( {aux_received_char, 24'h000000} !== `AUX_SET_SAMPLE)
+    begin
+        $display("Time %t ", $time) ;
+        $display("PS2 mouse didn't receive expected character! Expected %h, actual %h !", `AUX_SET_SAMPLE, aux_received_char ) ;
+    end
+
+    data   = 1 ;
+    status = 1 ;
+
+    kbd_write(`KBD_CNTL_REG, `AUX_MAGIC_WRITE, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    data = 1 ;
+
+    kbd_write(`KBD_DATA_REG, `AUX_SET_RES, status) ;
+
+    if ( status !== 1 )
+        #1 disable main ;
+
+
+    @(aux_char_valid) ;
+    if ( {aux_received_char, 24'h000000} !== `AUX_SET_RES )
+    begin
+        $display("Time %t ", $time) ;
+        $display("PS2 mouse didn't receive expected character! Expected %h, actual %h !", `AUX_SET_RES, aux_received_char ) ;
+    end
+
+    data   = 1 ;
+    status = 1 ;
+
+    kbd_write(`KBD_CNTL_REG, `AUX_MAGIC_WRITE, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    data = 1 ;
+
+    kbd_write(`KBD_DATA_REG, {8'd100, 24'h000000}, status) ;
+
+    if ( status !== 1 )
+        #1 disable main ;
+
+    @(aux_char_valid) ;
+    if ( aux_received_char !== 8'd100 )
+    begin
+        $display("Time %t ", $time) ;
+        $display("PS2 mouse didn't receive expected character! Expected %h, actual %h !", 100, aux_received_char ) ;
+    end
+
+    data   = 1 ;
+    status = 1 ;
+
+    kbd_write(`KBD_CNTL_REG, `AUX_MAGIC_WRITE, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    data = 1 ;
+
+    kbd_write(`KBD_DATA_REG, {8'd3, 24'h000000}, status) ;
+
+    if ( status !== 1 )
+        #1 disable main ;
+
+
+    @(aux_char_valid) ;
+    if ( aux_received_char !== 8'd3 )
+    begin
+        $display("Time %t ", $time) ;
+        $display("PS2 mouse didn't receive expected character! Expected %h, actual %h !", 3, aux_received_char ) ;
+    end
+
+    data   = 1 ;
+    status = 1 ;
+
+    kbd_write(`KBD_CNTL_REG, `AUX_MAGIC_WRITE, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    data = 1 ;
+
+    kbd_write(`KBD_DATA_REG, `AUX_SET_SCALE21, status) ;
+
+    if ( status !== 1 )
+        #1 disable main ;
+
+    @(aux_char_valid) ;
+    if ( {aux_received_char, 24'h000000} !== `AUX_SET_SCALE21)
+    begin
+        $display("Time %t ", $time) ;
+        $display("PS2 mouse didn't receive expected character! Expected %h, actual %h !", `AUX_SET_SCALE21, aux_received_char ) ;
+    end
+
+    kbd_write(`KBD_CNTL_REG, `AUX_DISABLE, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    kbd_write(`KBD_CNTL_REG, `KBD_WRITE_MODE, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    kbd_write(`KBD_DATA_REG, `AUX_INTS_OFF, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    data = 1 ;
+
+    kbd_write(`KBD_CNTL_REG, `AUX_ENABLE, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    kbd_write(`KBD_CNTL_REG, `AUX_MAGIC_WRITE, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    data = 1 ;
+
+    kbd_write(`KBD_DATA_REG, `AUX_ENABLE_DEV, status) ;
+
+    if ( status !== 1 )
+        #1 disable main ;
+
+    @(aux_char_valid) ;
+    if ( {aux_received_char, 24'h000000} !== `AUX_ENABLE_DEV)
+    begin
+        $display("Time %t ", $time) ;
+        $display("PS2 mouse didn't receive expected character! Expected %h, actual %h !", `AUX_ENABLE_DEV, aux_received_char ) ;
+    end
+
+    kbd_write(`KBD_CNTL_REG, `KBD_WRITE_MODE, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    kbd_write(`KBD_DATA_REG, `AUX_INTS_ON, status) ;
+    if ( status !== 1 )
+        #1 disable main ;
+
+    watchdog_reset = !watchdog_reset ;
+    `endif
+
 end
-endtask // initialize_controler 
+endtask // initialize_controler
 
 task read_data_reg ;
     output [7:0] return_byte_o ;
@@ -524,7 +750,16 @@ task read_data_reg ;
     reg `READ_STIM_TYPE    read_data ;
     reg `READ_RETURN_TYPE  read_status ;
     reg `WB_TRANSFER_FLAGS flags ;
-begin
+    reg in_use ;
+begin:main
+    if ( in_use === 1 )
+    begin
+        $display("Task read_data_reg re-entered! Time %t", $time) ;
+        #1 disable main ;
+    end
+    else
+        in_use = 1 ;
+
     ok_o = 1 ;
     flags`WB_TRANSFER_SIZE     = 1 ;
     flags`WB_TRANSFER_AUTO_RTY = 0 ;
@@ -548,7 +783,9 @@ begin
     else
         return_byte_o = read_status`READ_DATA ;
 
-end 
+    in_use = 0 ;
+
+end
 endtask //read_data_reg
 
 task read_status_reg ;
@@ -557,21 +794,30 @@ task read_status_reg ;
     reg `READ_STIM_TYPE    read_data ;
     reg `READ_RETURN_TYPE  read_status ;
     reg `WB_TRANSFER_FLAGS flags ;
-begin
+    reg in_use ;
+begin:main
+    if ( in_use === 1 )
+    begin
+        $display("Task read_status_reg re-entered! Time %t !", $time) ;
+        #1 disable main ;
+    end
+    else
+        in_use = 1 ;
+
     ok_o = 1 ;
     flags`WB_TRANSFER_SIZE     = 1 ;
     flags`WB_TRANSFER_AUTO_RTY = 0 ;
     flags`WB_TRANSFER_CAB      = 0 ;
     flags`INIT_WAITS           = 0 ;
     flags`SUBSEQ_WAITS         = 0 ;
- 
+
     read_data`READ_ADDRESS = `KBD_STATUS_REG ;
     read_data`READ_SEL     = 4'h8 ;
- 
+
     read_status = 0 ;
- 
+
     i_wb_master.wb_single_read( read_data, flags, read_status ) ;
- 
+
     if ( read_status`CYC_ACK !== 1'b1 )
     begin
         $display("Error! Keyboard controler didn't acknowledge single read access!") ;
@@ -581,6 +827,7 @@ begin
     else
         return_byte_o = read_status`READ_DATA ;
 
+    in_use = 0 ;
 end
 endtask // read_status_reg
 
@@ -602,7 +849,7 @@ begin:main
     flags`SUBSEQ_WAITS         = 0 ;
 
     write_data`WRITE_ADDRESS = address_i ;
-    write_data`WRITE_DATA    = data_i ;    
+    write_data`WRITE_DATA    = data_i ;
     write_data`WRITE_SEL     = 4'h8 ;
 
     read_status_reg(kbd_status, ok_o) ;
@@ -613,7 +860,7 @@ begin:main
     end
 
     if ( ok_o !== 1 )
-        disable main ;
+        #1 disable main ;
 
     i_wb_master.wb_single_write( write_data, flags, write_status ) ;
 
@@ -623,7 +870,7 @@ begin:main
         #400 $stop ;
         ok_o = 0 ;
     end
-end 
+end
 endtask // kbd_write
 
 task test_scan_code_receiving ;
@@ -660,24 +907,24 @@ begin:main
     begin
         send_sequence( keyboard_sequence, 6, ok_keyboard ) ;
         if ( ok_keyboard !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     begin
         receive_sequence( controler_sequence, 4, ok_controler ) ;
 
         if ( ok_controler !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     join
 
     // test same thing with translation disabled!
     kbd_write(`KBD_CNTL_REG, `KBD_WRITE_MODE, ok);
     if ( ok !== 1 )
-        disable main ;
- 
-    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`KBD_DMS, ok);
+        #1 disable main ;
+
+    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`AUX_INTERRUPT_ON, ok);
     if ( ok !== 1 )
-        disable main ; 
+        #1 disable main ;
 
     // since translation is disabled, controler sequence is the same as keyboard sequence
     controler_sequence = keyboard_sequence ;
@@ -687,24 +934,24 @@ begin:main
 
         send_sequence( keyboard_sequence, 6, ok_keyboard ) ;
         if ( ok_keyboard !== 1 )
-            disable main ;
-         
+            #1 disable main ;
+
     end
     begin
         receive_sequence( controler_sequence, 6, ok_controler ) ;
         if ( ok_controler !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     join
 
     // turn translation on again
     kbd_write(`KBD_CNTL_REG, `KBD_WRITE_MODE, ok);
     if ( ok !== 1 )
-        disable main ;
- 
-    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC, ok);
+        #1 disable main ;
+
+    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`AUX_INTERRUPT_ON|`KBD_KCC, ok);
     if ( ok !== 1 )
-        disable main ;
+        #1 disable main ;
 
     // test extended character receiving - rctrl + s combination
     // prepare sequence to send from keyboard to controler
@@ -737,41 +984,41 @@ begin:main
     begin
         send_sequence( keyboard_sequence, 8, ok_keyboard ) ;
         if ( ok_keyboard !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     begin
- 
+
         receive_sequence( controler_sequence, 6, ok_controler ) ;
- 
+
         if ( ok_controler !== 1 )
-            disable main ;       
+            #1 disable main ;
     end
     join
 
      // test same thing with translation disabled!
     kbd_write(`KBD_CNTL_REG, `KBD_WRITE_MODE, ok);
     if ( ok !== 1 )
-        disable main ;
- 
-    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`KBD_DMS, ok);
+        #1 disable main ;
+
+    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`AUX_INTERRUPT_ON, ok);
     if ( ok !== 1 )
-        disable main ;
- 
+        #1 disable main ;
+
     // since translation is disabled, controler sequence is the same as keyboard sequence
-    controler_sequence = keyboard_sequence ; 
+    controler_sequence = keyboard_sequence ;
 
     fork
     begin
         send_sequence( keyboard_sequence, 8, ok_keyboard ) ;
         if ( ok_keyboard !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     begin
- 
+
         receive_sequence( controler_sequence, 8, ok_controler ) ;
- 
+
         if ( ok_controler !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     join
 
@@ -785,16 +1032,16 @@ task test_normal_scancodes ;
     reg ok_controler ;
     integer i ;
     reg [(MAX_SEQUENCE_LENGTH*8 - 1) : 0] keyboard_sequence ;
-    reg [(MAX_SEQUENCE_LENGTH*8 - 1) : 0] controler_sequence ; 
+    reg [(MAX_SEQUENCE_LENGTH*8 - 1) : 0] controler_sequence ;
 begin:main
     // turn translation on
     kbd_write(`KBD_CNTL_REG, `KBD_WRITE_MODE, ok);
     if ( ok !== 1 )
-        disable main ;
- 
-    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC, ok);
+        #1 disable main ;
+
+    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`AUX_INTERRUPT_ON|`KBD_KCC, ok);
     if ( ok !== 1 )
-        disable main ;
+        #1 disable main ;
 
     for ( i = 0 ; i < `PS2_NUM_OF_NORMAL_SCANCODES ; i = i + 1 )
     begin
@@ -808,18 +1055,18 @@ begin:main
         begin
             send_sequence( keyboard_sequence, 3, ok_keyboard ) ;
             if ( ok_keyboard !== 1 )
-                disable main ;
+                #1 disable main ;
         end
         begin
             receive_sequence( controler_sequence, 2, ok_controler ) ;
             if ( ok_controler !== 1 )
-                disable main ;
+                #1 disable main ;
         end
         join
     end
 
     watchdog_reset = !watchdog_reset ;
-    
+
 end
 endtask // test_normal_scancodes
 
@@ -834,12 +1081,12 @@ begin:main
     // turn translation on
     kbd_write(`KBD_CNTL_REG, `KBD_WRITE_MODE, ok);
     if ( ok !== 1 )
-        disable main ;
- 
-    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC, ok);
+        #1 disable main ;
+
+    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`AUX_INTERRUPT_ON|`KBD_KCC, ok);
     if ( ok !== 1 )
-        disable main ;
- 
+        #1 disable main ;
+
     for ( i = 0 ; i < `PS2_NUM_OF_EXTENDED_SCANCODES ; i = i + 1 )
     begin
         keyboard_sequence[7:0]   = 8'hE0 ;
@@ -847,7 +1094,7 @@ begin:main
         keyboard_sequence[23:16] = 8'hE0 ;
         keyboard_sequence[31:24] = 8'hF0 ;
         keyboard_sequence[39:32] = extended_scancode_set2_mem[i] ;
- 
+
         controler_sequence[7:0]   = 8'hE0 ;
         controler_sequence[15:8]  = extended_scancode_set1_mem[i] ;
         controler_sequence[23:16] = 8'hE0 ;
@@ -856,18 +1103,18 @@ begin:main
         begin
             send_sequence( keyboard_sequence, 5, ok_keyboard ) ;
             if ( ok_keyboard !== 1 )
-                disable main ;
+                #1 disable main ;
         end
         begin
             receive_sequence( controler_sequence, 4, ok_controler ) ;
             if ( ok_controler !== 1 )
-                disable main ;
+                #1 disable main ;
         end
         join
     end
- 
+
     watchdog_reset = !watchdog_reset ;
- 
+
 end
 endtask // test_extended_scancodes
 
@@ -878,20 +1125,26 @@ task return_scan_code_on_irq ;
 begin:main
     wait ( wb_int === 1 ) ;
     read_status_reg( temp_data, ok_o ) ;
- 
+
     if ( ok_o !== 1'b1 )
-        disable main ;
- 
+        #1 disable main ;
+
     if ( !( temp_data & `KBD_OBF ) )
     begin
         $display("Error! Interrupt received from keyboard controler when OBF status not set!") ;
         #400 $stop ;
     end
- 
+
+    if ( temp_data & `AUX_OBUF_FULL )
+    begin
+        $display("Error! Interrupt received from keyboard controler when AUX_OBUF_FULL status was set!") ;
+        #400 $stop ;
+    end
+
     read_data_reg( temp_data, ok_o ) ;
- 
+
     if ( ok_o !== 1'b1 )
-        disable main ;
+        #1 disable main ;
 
     scan_code_o = temp_data ;
 end
@@ -911,10 +1164,10 @@ begin:main
     ok_o  = 1 ;
     ok    = 0 ;
 
-    for( i = 0 ; i < num_of_chars_i ; i = i + 1 ) 
+    for( i = 0 ; i < num_of_chars_i ; i = i + 1 )
     begin
         current_char = sequence_i[7:0] ;
-        
+
         sequence_i = sequence_i >> 8 ;
         ok = 0 ;
         error = 0 ;
@@ -925,7 +1178,7 @@ begin:main
                 current_char,
                 ok,
                 error
-            ) ; 
+            ) ;
         end
 
         if ( error )
@@ -933,7 +1186,7 @@ begin:main
             $display("Time %t", $time) ;
             $display("Keyboard model signaled an error!") ;
             ok_o = 0 ;
-            disable main ;
+            #1 disable main ;
         end
     end
 end
@@ -947,19 +1200,19 @@ task receive_sequence ;
     reg [7:0] data ;
     integer i ;
 begin:main
- 
+
     ok_o  = 1 ;
- 
+
     for( i = 0 ; i < num_of_chars_i ; i = i + 1 )
     begin
         current_char = sequence_i[7:0] ;
- 
+
         sequence_i = sequence_i >> 8 ;
 
         return_scan_code_on_irq( data, ok_o ) ;
 
         if ( ok_o !== 1 )
-            disable main ; 
+            #1 disable main ;
 
         if ( data !== current_char )
         begin
@@ -988,13 +1241,13 @@ begin:main
     if ( error )
     begin
         $display("Error! Keyboard signaled an error while sending character!") ;
-        disable main ;
+        #1 disable main ;
     end
 
     if ( !ok_keyboard )
     begin
         $display("Something is wrong! Keyboard wasn't able to send a character!") ;
-        disable main ;
+        #1 disable main ;
     end
 
     // wait 5 us to see, if keyboard is inhibited
@@ -1004,13 +1257,13 @@ begin:main
     if ( kbd_clk_cable !== 0 )
     begin
         $display("Error! Keyboard wasn't inhibited when output buffer was filled!") ;
-        disable main ;
+        #1 disable main ;
     end
 
     // now read the character from input buffer and check if clock was released
     return_scan_code_on_irq( data, ok_controler ) ;
     if ( ok_controler !== 1'b1 )
-        disable main ;
+        #1 disable main ;
 
     if ( data !== 8'hE0 )
     begin
@@ -1026,7 +1279,7 @@ begin:main
         if ( kbd_clk_cable !== 1 )
         begin
             $display("Error! Keyboard wasn't released from inhibited state when output buffer was read!") ;
-            disable main ;
+            #1 disable main ;
         end
     end
     begin
@@ -1039,14 +1292,14 @@ begin:main
         if ( !ok_keyboard )
         begin
             $display("Something is wrong! Keyboard wasn't able to send a character!") ;
-            disable main ;
+            #1 disable main ;
         end
     end
     begin
         return_scan_code_on_irq( data, ok_controler ) ;
         if ( ok_controler !== 1'b1 )
-            disable main ;
- 
+            #1 disable main ;
+
         if ( data !== 8'h1E )
         begin
             $display("Time %t", $time) ;
@@ -1058,21 +1311,21 @@ begin:main
     // disable keyboard controler
     kbd_write( `KBD_CNTL_REG, `KBD_WRITE_MODE, ok_controler ) ;
     if ( ok_controler !== 1 )
-        disable main ;
+        #1 disable main ;
 
-    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC | `KBD_DISABLE_COMMAND, ok_controler); 
+    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`AUX_INTERRUPT_ON|`KBD_KCC | `KBD_DISABLE_COMMAND, ok_controler);
 
     if ( ok_controler !== 1 )
-        disable main ;
+        #1 disable main ;
 
     repeat( 5 )
         @(posedge wb_clock) ;
 
-    // now check, if clock line is low!
-    if ( kbd_clk_cable !== 0 )
+    // now check, if clock line is high!
+    if ( kbd_clk_cable !== 1 )
     begin
-        $display("Error! Keyboard wasn't inhibited when keyboard controler was disabled!") ;
-        disable main ;
+        $display("Error! Keyboard is not supposed to be inhibited when keyboard controler is disabled!") ;
+        #1 disable main ;
     end
 
     // send character and enable keyboard controler at the same time
@@ -1084,28 +1337,28 @@ begin:main
             ok_keyboard,
             error
         ) ;
- 
+
         if ( !ok_keyboard )
         begin
             $display("Something is wrong! Keyboard wasn't able to send a character!") ;
-            disable main ;
-        end    
+            #1 disable main ;
+        end
     end
     begin
         // enable keyboard controler
         kbd_write( `KBD_CNTL_REG, `KBD_WRITE_MODE, ok_controler ) ;
         if ( ok_controler !== 1 )
-            disable main ;
- 
-        kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC, ok_controler);
+            #1 disable main ;
+
+        kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`AUX_INTERRUPT_ON|`KBD_KCC, ok_controler);
         if ( ok_controler !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     begin
         return_scan_code_on_irq( data, ok_controler ) ;
         if ( ok_controler !== 1'b1 )
-            disable main ;
- 
+            #1 disable main ;
+
         if ( data !== 8'hE0 )
         begin
             $display("Time %t", $time) ;
@@ -1117,18 +1370,18 @@ begin:main
     // do D2 command, that copies parameter in input buffer to output buffer
     kbd_write( `KBD_CNTL_REG, 32'hD2_00_00_00, ok_controler ) ;
     if ( ok_controler !== 1 )
-        disable main ;
+        #1 disable main ;
 
     kbd_write(`KBD_DATA_REG, 32'h5555_5555, ok_controler) ;
 
     if ( ok_controler !== 1 )
-        disable main ;
+        #1 disable main ;
 
     return_scan_code_on_irq( data, ok_controler ) ;
     if ( ok_controler !== 1 )
-        disable main ;
+        #1 disable main ;
 
-    if ( data !== 8'h55 ) 
+    if ( data !== 8'h55 )
     begin
         $display("Error! D2 command doesn't work properly") ;
     end
@@ -1147,11 +1400,11 @@ begin:main
     // turn translation on
     kbd_write(`KBD_CNTL_REG, `KBD_WRITE_MODE, ok);
     if ( ok !== 1 )
-        disable main ;
- 
-    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`KBD_DMS|`KBD_KCC, ok);
+        #1 disable main ;
+
+    kbd_write(`KBD_DATA_REG, `KBD_EKI|`KBD_SYS|`AUX_INTERRUPT_ON|`KBD_KCC, ok);
     if ( ok !== 1 )
-        disable main ; 
+        #1 disable main ;
 
     // prepare character sequence to send from keyboard to controler - pause
     keyboard_sequence[7:0]   = 8'hE1 ;
@@ -1162,7 +1415,7 @@ begin:main
     keyboard_sequence[47:40] = 8'h14 ;
     keyboard_sequence[55:48] = 8'hF0 ;
     keyboard_sequence[63:56] = 8'h77 ;
- 
+
     // prepare character sequence as it is received in scan code set 1 through the controler
     controler_sequence[7:0]   = 8'hE1 ;
     controler_sequence[15:8]  = 8'h1D ;
@@ -1175,12 +1428,12 @@ begin:main
     begin
         send_sequence( keyboard_sequence, 8, ok_keyboard ) ;
         if ( ok_keyboard !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     begin
         receive_sequence( controler_sequence, 6, ok_controler ) ;
         if ( ok_controler !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     join
 
@@ -1189,7 +1442,7 @@ begin:main
     keyboard_sequence[15:8]  = 8'h12 ;
     keyboard_sequence[23:16] = 8'hE0 ;
     keyboard_sequence[31:24] = 8'h7C ;
- 
+
     // prepare character sequence as it is received in scan code set 1 through the controler
     controler_sequence[7:0]   = 8'hE0 ;
     controler_sequence[15:8]  = 8'h2A ;
@@ -1200,12 +1453,12 @@ begin:main
     begin
         send_sequence( keyboard_sequence, 4, ok_keyboard ) ;
         if ( ok_keyboard !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     begin
         receive_sequence( controler_sequence, 4, ok_controler ) ;
         if ( ok_controler !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     join
 
@@ -1216,7 +1469,7 @@ begin:main
     keyboard_sequence[31:24] = 8'hE0 ;
     keyboard_sequence[39:32] = 8'hF0 ;
     keyboard_sequence[47:40] = 8'h12 ;
- 
+
     // prepare character sequence as it is received in scan code set 1 through the controler
     controler_sequence[7:0]   = 8'hE0 ;
     controler_sequence[15:8]  = 8'hB7 ;
@@ -1227,15 +1480,98 @@ begin:main
     begin
         send_sequence( keyboard_sequence, 6, ok_keyboard ) ;
         if ( ok_keyboard !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     begin
         receive_sequence( controler_sequence, 4, ok_controler ) ;
         if ( ok_controler !== 1 )
-            disable main ;
+            #1 disable main ;
     end
     join
 end
 endtask // test_print_screen_and_pause_scancodes
+
+`ifdef PS2_AUX
+task receive_mouse_movement;
+    reg [7:0] mouse_data_received ;
+    reg ok_mouse ;
+    reg ok_wb ;
+    reg error ;
+    integer num_of_mouse_data_sent ;
+begin:main
+    error    = 0 ;
+    num_of_mouse_data_sent     = 0 ;
+    while ( !stop_mouse_tests )
+    begin
+        fork
+        begin
+            ok_mouse = 0 ;
+            while ( !ok_mouse && !error )
+            begin
+                i_ps2_mouse_model.kbd_send_char
+                (
+                    num_of_mouse_data_sent[7:0],
+                    ok_mouse,
+                    error
+                ) ;
+            end
+            if ( error )
+            begin
+                $display("Mouse model signaled an error while transmiting data! Time %t", $time) ;
+                #1 disable main ;
+            end
+            else
+                num_of_mouse_data_sent = num_of_mouse_data_sent + 1 ;
+
+        end
+        begin
+            return_mouse_data_on_irq( mouse_data_received, ok_wb ) ;
+            if ( !ok_wb )
+                #1 disable main ;
+
+            if ( mouse_data_received !== num_of_mouse_data_sent[7:0] )
+            begin
+                $display("Time %t", $time) ;
+                $display("Data received from mouse has unexpected value! Expected %h, actual %h", num_of_mouse_data_sent[7:0], mouse_data_received) ;
+            end
+        end
+        join
+    end
+
+    $display("Number of chars received from mouse %d", num_of_mouse_data_sent) ;
+end
+endtask //receive_mouse_movement
+
+task return_mouse_data_on_irq ;
+    output [7:0] mouse_data_o ;
+    output       ok_o ;
+    reg    [7:0] temp_data ;
+begin:main
+    wait ( wb_intb === 1 ) ;
+
+    wait ( ps2_test_bench.read_status_reg.in_use !== 1'b1 );
+
+    read_status_reg( temp_data, ok_o ) ;
+
+    if ( ok_o !== 1'b1 )
+        #1 disable main ;
+
+    if ( !( temp_data & `AUX_OBUF_FULL ) || !(temp_data & `KBD_OBF))
+    begin
+        $display("Error! Interrupt b received from controler when AUX_OBF status or KBD_OBF statuses not set!") ;
+        #400 $stop ;
+    end
+
+    wait ( ps2_test_bench.read_data_reg.in_use !== 1'b1 );
+
+    read_data_reg( temp_data, ok_o ) ;
+
+    if ( ok_o !== 1'b1 )
+        #1 disable main ;
+
+    mouse_data_o = temp_data ;
+end
+endtask // return_scan_code_on_irq
+`endif
 
 endmodule // ps2_test_bench

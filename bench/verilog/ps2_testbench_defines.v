@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.1.1.1  2002/02/18 16:16:56  mihad
+// Initial project import - working
+//
 //
 
 //===================================================================================
@@ -144,4 +147,4 @@
 `define INIT_WAITS           [3:0]
 `define SUBSEQ_WAITS         [7:4]
 
-`define WB_FREQ 0.032
+`define WB_FREQ 0.025
