@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.2  2002/04/09 13:21:15  mihad
+// Added mouse interface and everything for its handling, cleaned up some unused code
+//
 // Revision 1.1.1.1  2002/02/18 16:16:56  mihad
 // Initial project import - working
 //
@@ -95,7 +98,7 @@ input wb_clk_i,
 
 input [3:0] wb_sel_i ;
 
-input [31:0]wb_adr_i,
+input [2:0] wb_adr_i,
             wb_dat_i ;
 
 output [31:0] wb_dat_o ;

@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.5  2002/04/09 13:17:03  mihad
+// Mouse interface testcases added
+//
 // Revision 1.4  2002/02/20 16:35:34  mihad
 // Little/big endian changes continued
 //
@@ -267,7 +270,7 @@ i_ps2_top
     .wb_stb_i        (wb_stb),
     .wb_we_i         (wb_we),
     .wb_sel_i        (wb_sel),
-    .wb_adr_i        (wb_adr),
+    .wb_adr_i        (wb_adr[2:0]),
     .wb_dat_i        (wb_dat_m_s),
     .wb_dat_o        (wb_dat_s_m),
     .wb_ack_o        (wb_ack),
