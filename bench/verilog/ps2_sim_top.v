@@ -43,8 +43,12 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.1.1.1  2002/02/18 16:16:55  mihad
+// Initial project import - working
+//
 //
 
+`include "ps2_defines.v"
 module ps2_sim_top
 (
     wb_clk_i,
@@ -57,11 +61,19 @@ module ps2_sim_top
     wb_dat_i,
     wb_dat_o,
     wb_ack_o,
- 
+
     wb_int_o,
- 
+
     ps2_kbd_clk_io,
     ps2_kbd_data_io
+
+    `ifdef PS2_AUX
+    ,
+    wb_intb_o,
+
+    ps2_aux_clk_io,
+    ps2_aux_data_io
+    `endif
 ) ;
 
 input wb_clk_i,
@@ -79,10 +91,14 @@ output [31:0] wb_dat_o ;
 
 output wb_ack_o,
        wb_int_o ;
- 
+
 inout  ps2_kbd_clk_io,
        ps2_kbd_data_io ;
-
+`ifdef PS2_AUX
+output wb_intb_o ;
+inout  ps2_aux_clk_io ;
+inout  ps2_aux_data_io ;
+`endif
 
 wire ps2_kbd_clk_pad_i  = ps2_kbd_clk_io ;
 wire ps2_kbd_data_pad_i = ps2_kbd_data_io ;
@@ -104,17 +120,34 @@ ps2_top i_ps2_top
     .wb_dat_i              (wb_dat_i),
     .wb_dat_o              (wb_dat_o),
     .wb_ack_o              (wb_ack_o),
- 
+
     .wb_int_o              (wb_int_o),
- 
+
     .ps2_kbd_clk_pad_i     (ps2_kbd_clk_pad_i),
     .ps2_kbd_data_pad_i    (ps2_kbd_data_pad_i),
     .ps2_kbd_clk_pad_o     (ps2_kbd_clk_pad_o),
     .ps2_kbd_data_pad_o    (ps2_kbd_data_pad_o),
     .ps2_kbd_clk_pad_oe_o  (ps2_kbd_clk_pad_oe_o),
     .ps2_kbd_data_pad_oe_o (ps2_kbd_data_pad_oe_o)
+
+    `ifdef PS2_AUX
+    ,
+    .wb_intb_o (wb_intb_o),
+
+    .ps2_aux_clk_pad_i (ps2_aux_clk_io),
+    .ps2_aux_data_pad_i (ps2_aux_data_io),
+    .ps2_aux_clk_pad_o (ps2_aux_clk_pad_o),
+    .ps2_aux_data_pad_o (ps2_aux_data_pad_o),
+    .ps2_aux_clk_pad_oe_o (ps2_aux_clk_pad_oe_o),
+    .ps2_aux_data_pad_oe_o (ps2_aux_data_pad_oe_o)
+    `endif
 ) ;
 
 assign ps2_kbd_clk_io  = ps2_kbd_clk_pad_oe_o  ? ps2_kbd_clk_pad_o  : 1'bz ;
 assign ps2_kbd_data_io = ps2_kbd_data_pad_oe_o ? ps2_kbd_data_pad_o : 1'bz ;
+
+`ifdef PS2_AUX
+assign ps2_aux_clk_io  = ps2_aux_clk_pad_oe_o  ? ps2_aux_clk_pad_o  : 1'bz ;
+assign ps2_aux_data_io = ps2_aux_data_pad_oe_o ? ps2_aux_data_pad_o : 1'bz ;
+`endif
 endmodule
