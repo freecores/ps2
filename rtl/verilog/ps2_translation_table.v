@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.3  2003/06/02 17:13:22  simons
+// resetall keyword removed. ifdef moved to a separated line.
+//
 // Revision 1.2  2002/04/09 13:21:15  mihad
 // Added mouse interface and everything for its handling, cleaned up some unused code
 //
@@ -141,6 +144,46 @@ end
 
 `endif
 
+`ifdef PS2_CONSTANTS_ROM
+    `define PS2_RAM_SELECTED
+
+    reg [32 * 8 - 1:0] ps2_32byte_constant ;
+    reg [7:0] ram_out ;
+
+    always@(translation_table_address)
+    begin
+        case (translation_table_address[7:5])
+            3'b000:ps2_32byte_constant = `PS2_TRANSLATION_TABLE_31_0    ;
+            3'b001:ps2_32byte_constant = `PS2_TRANSLATION_TABLE_63_32   ;
+            3'b010:ps2_32byte_constant = `PS2_TRANSLATION_TABLE_95_64   ;
+            3'b011:ps2_32byte_constant = `PS2_TRANSLATION_TABLE_127_96  ;
+            3'b100:ps2_32byte_constant = `PS2_TRANSLATION_TABLE_159_128 ;
+            3'b101:ps2_32byte_constant = `PS2_TRANSLATION_TABLE_191_160 ;
+            3'b110:ps2_32byte_constant = `PS2_TRANSLATION_TABLE_223_192 ;
+            3'b111:ps2_32byte_constant = `PS2_TRANSLATION_TABLE_255_224 ;
+        endcase
+    end
+
+    always@(posedge clock_i or posedge reset_i)
+    begin
+        if ( reset_i )
+            ram_out <= #1 8'h0 ;
+        else if ( translation_table_enable )
+        begin:get_dat_out
+            reg [7:0] bit_num ;
+    
+            bit_num = translation_table_address[4:0] << 3 ;
+
+            repeat(8)
+            begin
+                ram_out[bit_num % 8] <= #1 ps2_32byte_constant[bit_num] ;
+                bit_num = bit_num + 1'b1 ;
+            end
+        end
+    end
+
+`endif
+
 `ifdef PS2_RAM_SELECTED
 `else
     `define PS2_RAM_SELECTED
@@ -163,10 +206,11 @@ end
     end
 
     // synopsys translate_off
-    integer i ;
-    reg [255:0] temp_init_val ;
     initial
-    begin
+    begin:ps2_ram_init
+        integer i ;
+        reg [255:0] temp_init_val ;
+
         temp_init_val = `PS2_TRANSLATION_TABLE_31_0 ;
 
         for ( i = 0 ; i <= 31 ; i = i + 1 )

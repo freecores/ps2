@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.3  2002/04/09 13:21:15  mihad
+// Added mouse interface and everything for its handling, cleaned up some unused code
+//
 // Revision 1.2  2002/02/18 16:33:08  mihad
 // Changed defines for simulation to work without xilinx primitives
 //
@@ -51,7 +54,9 @@
 //
 //
 
-`define PS2_RAMB4
+//`define PS2_RAMB4
+`define PS2_CONSTANTS_ROM
+
 `define PS2_TRANSLATION_TABLE_31_0    256'h5b03111e1f2c71665a02101d702a386559290f3e40424464583c3b3d3f4143ff
 `define PS2_TRANSLATION_TABLE_63_32   256'h5f0908162432726a5e071522233031695d061314212f39685c040512202d2e67
 `define PS2_TRANSLATION_TABLE_95_64   256'h76632b751b1c363a6e620d1a7428736d610c19272635346c600a0b181725336b
@@ -67,5 +72,3 @@
 `define PS2_TIMER_5USEC_BITS_PP 7       // Number of bits needed for timer
 
 //`define PS2_AUX
-
-//`define SIM
