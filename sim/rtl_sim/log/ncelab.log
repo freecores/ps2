@@ -1,4 +1,4 @@
-TOOL:	ncelab	04.10-b001: Started on Dec 01, 2003 at 15:50:29
+TOOL:	ncelab	04.10-b001: Started on Dec 09, 2003 at 12:26:38
 ncelab
     -f ncelab.args
         -MESSAGES
@@ -53,4 +53,4 @@ ncelab
 		Pseudo assignments:      5      59
 		Simulation timescale:  1ps
 	Writing initial simulation snapshot: worklib.ps2_test_bench:rtl
-TOOL:	ncelab	04.10-b001: Exiting on Dec 01, 2003 at 15:50:32  (total: 00:00:03)
+TOOL:	ncelab	04.10-b001: Exiting on Dec 09, 2003 at 12:26:40  (total: 00:00:02)

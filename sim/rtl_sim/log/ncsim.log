@@ -1,4 +1,4 @@
-TOOL:	ncsim	04.10-b001: Started on Dec 01, 2003 at 15:50:33
+TOOL:	ncsim	04.10-b001: Started on Dec 09, 2003 at 12:26:41
 ncsim
     -LICQUEUE
     -f ./ncsim.args
@@ -24,4 +24,4 @@ report (deaddead)
 exit (00000000)
 /projects/highland/gorand/tmp/ps2/bench/verilog/ps2_test_bench.v:289     $finish(0);
 ncsim> quit
-TOOL:	ncsim	04.10-b001: Exiting on Dec 01, 2003 at 15:58:05  (total: 00:07:32)
+TOOL:	ncsim	04.10-b001: Exiting on Dec 09, 2003 at 12:34:33  (total: 00:07:52)

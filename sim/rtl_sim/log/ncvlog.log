@@ -1,4 +1,4 @@
-TOOL:	ncvlog	04.10-b001: Started on Dec 01, 2003 at 15:50:28
+TOOL:	ncvlog	04.10-b001: Started on Dec 09, 2003 at 12:26:38
 ncvlog
     -f ncvlog.args
         -CDSLIB ../bin/cds.lib
@@ -56,4 +56,4 @@ file: ../../../bench/verilog/wb_master_behavioral.v
 file: ../../../bench/verilog/ps2_sim_top.v
 	module worklib.ps2_sim_top:v
 		errors: 0, warnings: 0
-TOOL:	ncvlog	04.10-b001: Exiting on Dec 01, 2003 at 15:50:29  (total: 00:00:01)
+TOOL:	ncvlog	04.10-b001: Exiting on Dec 09, 2003 at 12:26:38  (total: 00:00:00)
