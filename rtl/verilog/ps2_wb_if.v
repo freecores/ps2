@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.2  2002/02/18 18:07:55  mihad
+// One bug fixed
+//
 // Revision 1.1.1.1  2002/02/18 16:16:56  mihad
 // Initial project import - working
 //
@@ -133,16 +136,16 @@ wire perr                     = 1'b0 ;
 wire [7:0] status_byte = {perr, timeout, mouse_output_buffer_full, kbd_inhibit, a2, system_flag, output_buffer_full, input_buffer_full} ;
 
 reg  read_input_buffer_reg ;
-wire read_input_buffer = wb_cyc_i && wb_stb_i && wb_sel_i[0] && !wb_ack_o && !read_input_buffer_reg && !wb_we_i && (wb_adr_i[2:0] == 3'h0) ;
+wire read_input_buffer = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !read_input_buffer_reg && !wb_we_i && (wb_adr_i[2:0] == 3'h0) ;
 
 reg  write_output_buffer_reg ;
-wire write_output_buffer  = wb_cyc_i && wb_stb_i && wb_sel_i[0] && !wb_ack_o && !write_output_buffer_reg && wb_we_i  && (wb_adr_i[2:0] == 3'h0) ;
+wire write_output_buffer  = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !write_output_buffer_reg && wb_we_i  && (wb_adr_i[2:0] == 3'h0) ;
 
 reg  read_status_register_reg ;
-wire read_status_register = wb_cyc_i && wb_stb_i && wb_sel_i[0] && !wb_ack_o && !read_status_register_reg && !wb_we_i && (wb_adr_i[2:0] == 3'h4) ;
+wire read_status_register = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !read_status_register_reg && !wb_we_i && (wb_adr_i[2:0] == 3'h4) ;
 
 reg  send_command_reg ;
-wire send_command = wb_cyc_i && wb_stb_i && wb_sel_i[0] && !wb_ack_o && !send_command_reg && wb_we_i  && (wb_adr_i[2:0] == 3'h4) ;
+wire send_command = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !send_command_reg && wb_we_i  && (wb_adr_i[2:0] == 3'h4) ;
 
 reg  translate_o,
      enable1,

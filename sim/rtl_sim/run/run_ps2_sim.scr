@@ -45,6 +45,9 @@
 #// CVS Revision History
 #//
 #// $Log: not supported by cvs2svn $
+#// Revision 1.1.1.1  2002/02/18 16:16:55  mihad
+#// Initial project import - working
+#//
 #//
 
 echo "-MESSAGES" > ./ncvlog.args
@@ -55,6 +58,7 @@ echo "-INCDIR ../../../bench/verilog" >> ./ncvlog.args
 echo "-INCDIR ../../../rtl/verilog" >> ./ncvlog.args
 echo '-DEFINE "PS2_NUM_OF_NORMAL_SCANCODES 85"' >> ./ncvlog.args
 echo '-DEFINE "PS2_NUM_OF_EXTENDED_SCANCODES 38"' >> ./ncvlog.args
+echo '-DEFINE "SIM"' >> ./ncvlog.args
 
 if ( $# > 0 ) then
     if ( $# == 1 ) then

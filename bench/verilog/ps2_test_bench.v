@@ -43,6 +43,9 @@
 // CVS Revision History
 //
 // $Log: not supported by cvs2svn $
+// Revision 1.2  2002/02/18 18:08:31  mihad
+// One bug fixed
+//
 // Revision 1.1.1.1  2002/02/18 16:16:55  mihad
 // Initial project import - working
 //
@@ -527,7 +530,7 @@ begin
     flags`SUBSEQ_WAITS         = 0 ;
 
     read_data`READ_ADDRESS = `KBD_DATA_REG ;
-    read_data`READ_SEL     = 4'h1 ;
+    read_data`READ_SEL     = 4'h8 ;
 
     read_status = 0 ;
 
@@ -560,7 +563,7 @@ begin
     flags`SUBSEQ_WAITS         = 0 ;
  
     read_data`READ_ADDRESS = `KBD_STATUS_REG ;
-    read_data`READ_SEL     = 4'h1 ;
+    read_data`READ_SEL     = 4'h8 ;
  
     read_status = 0 ;
  
@@ -597,7 +600,7 @@ begin:main
 
     write_data`WRITE_ADDRESS = address_i ;
     write_data`WRITE_DATA    = data_i ;    
-    write_data`WRITE_SEL     = 4'h1 ;
+    write_data`WRITE_SEL     = 4'h8 ;
 
     read_status_reg(kbd_status, ok_o) ;
 
