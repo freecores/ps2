@@ -1,0 +1,59 @@
+TOOL:	ncvlog	04.10-b001: Started on Nov 30, 2003 at 12:53:30
+ncvlog
+    -f ncvlog.args
+        -CDSLIB ../bin/cds.lib
+        -HDLVAR ../bin/hdl.var
+        -MESSAGES
+        -INCDIR ../../../bench/verilog
+        -INCDIR ../../../rtl/verilog
+        -NOCOPYRIGHT
+        -LOGFILE ../log/ncvlog.log
+        -DEFINE PS2_NUM_OF_NORMAL_SCANCODES 85
+        -DEFINE PS2_NUM_OF_EXTENDED_SCANCODES 38
+        -DEFINE SIM
+        ../../../rtl/verilog/ps2_keyboard.v
+        ../../../rtl/verilog/ps2_mouse.v
+        ../../../rtl/verilog/ps2_top.v
+        ../../../rtl/verilog/ps2_translation_table.v
+        ../../../rtl/verilog/ps2_wb_if.v
+        ../../../rtl/verilog/ps2_io_ctrl.v
+        ../../../bench/verilog/ps2_keyboard_model.v
+        ../../../bench/verilog/ps2_test_bench.v
+        ../../../bench/verilog/wb_master32.v
+        ../../../bench/verilog/wb_master_behavioral.v
+        ../../../bench/verilog/ps2_sim_top.v
+
+file: ../../../rtl/verilog/ps2_keyboard.v
+	module worklib.ps2_keyboard:v
+		errors: 0, warnings: 0
+file: ../../../rtl/verilog/ps2_mouse.v
+	module worklib.ps2_mouse:v
+		errors: 0, warnings: 0
+file: ../../../rtl/verilog/ps2_top.v
+	module worklib.ps2_top:v
+		errors: 0, warnings: 0
+file: ../../../rtl/verilog/ps2_translation_table.v
+	module worklib.ps2_translation_table:v
+		errors: 0, warnings: 0
+file: ../../../rtl/verilog/ps2_wb_if.v
+	module worklib.ps2_wb_if:v
+		errors: 0, warnings: 0
+file: ../../../rtl/verilog/ps2_io_ctrl.v
+	module worklib.ps2_io_ctrl:v
+		errors: 0, warnings: 0
+file: ../../../bench/verilog/ps2_keyboard_model.v
+	module worklib.ps2_keyboard_model:v
+		errors: 0, warnings: 0
+file: ../../../bench/verilog/ps2_test_bench.v
+	module worklib.ps2_test_bench:v
+		errors: 0, warnings: 0
+file: ../../../bench/verilog/wb_master32.v
+	module worklib.WB_MASTER32:v
+		errors: 0, warnings: 0
+file: ../../../bench/verilog/wb_master_behavioral.v
+	module worklib.WB_MASTER_BEHAVIORAL:v
+		errors: 0, warnings: 0
+file: ../../../bench/verilog/ps2_sim_top.v
+	module worklib.ps2_sim_top:v
+		errors: 0, warnings: 0
+TOOL:	ncvlog	04.10-b001: Exiting on Nov 30, 2003 at 12:53:30  (total: 00:00:00)
