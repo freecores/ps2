@@ -130,7 +130,7 @@ module ps2_mouse (
   tx_write,
   tx_write_ack_o,
   tx_error_no_ack,
-  devide_reg_i
+  divide_reg_i
   );
 
 // Parameters
@@ -188,7 +188,7 @@ input tx_write;
 output tx_write_ack_o;
 output tx_error_no_ack;
 
-input [15:0] devide_reg_i;
+input [15:0] divide_reg_i;
 
 reg rx_released;
 reg [7:0] rx_scan_code;
@@ -481,7 +481,7 @@ assign timer_60usec_done = (timer_60usec_count == (TIMER_60USEC_VALUE_PP ));
 always @(posedge clk or posedge reset)
 if (reset) timer_5usec <= #1 1;
 else if (!enable_timer_60usec) timer_5usec <= #1 1;
-else if (timer_5usec == devide_reg_i)
+else if (timer_5usec == divide_reg_i)
  begin
    timer_5usec <= #1 1;
    timer_done  <= #1 1;
@@ -498,7 +498,7 @@ begin
   if (~enable_timer_5usec) timer_5usec_count <= #1 0;
   else if (~timer_5usec_done) timer_5usec_count <= #1 timer_5usec_count + 1;
 end
-assign timer_5usec_done = (timer_5usec_count == devide_reg_i - 1);
+assign timer_5usec_done = (timer_5usec_count == divide_reg_i - 1);
 
 always @(posedge clk)
 begin

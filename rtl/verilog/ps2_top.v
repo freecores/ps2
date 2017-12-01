@@ -151,7 +151,7 @@ wire rx_released,
      ps2_ctrl_kbd_clk,
      inhibit_kbd_if ;
 
-wire [15:0] devide_reg;
+wire [15:0] divide_reg;
 
 wire [7:0] rx_scan_code,
            rx_translated_scan_code,
@@ -216,7 +216,7 @@ i_ps2_mouse
     .tx_write                    (tx_aux_write),
     .tx_write_ack_o              (tx_aux_write_ack),
     .tx_error_no_ack             (tx_error_no_aux_ack),
-    .devide_reg_i                (devide_reg)
+    .divide_reg_i                (divide_reg)
 );
 
 `endif
@@ -239,7 +239,7 @@ i_ps2_keyboard
     .tx_write_ack_o              (tx_kbd_write_ack),
     .tx_error_no_keyboard_ack    (tx_error_no_keyboard_ack),
     .translate                   (translate),
-    .devide_reg_i                (devide_reg)
+    .divide_reg_i                (divide_reg)
 );
 
 ps2_wb_if i_ps2_wb_if
@@ -257,7 +257,7 @@ ps2_wb_if i_ps2_wb_if
 
     .wb_int_o                      (wb_int_o),
 
-    .devide_reg_o                  (devide_reg),   
+    .divide_reg_o                  (divide_reg),
 
     .rx_scancode_i                 (rx_translated_scan_code),
     .rx_kbd_data_ready_i           (rx_translated_data_ready),

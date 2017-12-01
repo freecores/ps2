@@ -44,7 +44,7 @@
 //
 // $Log: not supported by cvs2svn $
 // Revision 1.7  2003/10/03 10:16:50  primozs
-// support for configurable devider added
+// support for configurable divider added
 //
 // Revision 1.6  2003/05/28 16:26:51  simons
 // Change the address width.
@@ -239,7 +239,7 @@ begin
    end
    
    begin
-      devider_write(4'h8,5000/wb_period + wb_rem ,ok_o);
+      divider_write(4'h8,5000/wb_period + wb_rem ,ok_o);
       
 
       @(posedge wb_clock) ;
@@ -931,7 +931,7 @@ begin:main
 end
 endtask // kbd_write
 
-task devider_write ;
+task divider_write ;
     input [31:0] address_i ;
     input [31:16] data_i ;
     output ok_o ;
@@ -961,7 +961,7 @@ begin:main
         ok_o = 0 ;
     end
 end
-endtask // devider_write
+endtask // divider_write
 
 task test_scan_code_receiving ;
     reg ok_keyboard ;

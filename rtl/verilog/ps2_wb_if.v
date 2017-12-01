@@ -44,7 +44,7 @@
 //
 // $Log: not supported by cvs2svn $
 // Revision 1.7  2003/10/03 10:16:52  primozs
-// support for configurable devider added
+// support for configurable divider added
 //
 // Revision 1.6  2003/05/28 16:27:09  simons
 // Change the address width.
@@ -93,7 +93,7 @@ module ps2_wb_if
     rx_kbd_read_o,
     translate_o,
     ps2_kbd_clk_i,
-    devide_reg_o,
+    divide_reg_o,
     inhibit_kbd_if_o
     `ifdef PS2_AUX
     ,
@@ -148,9 +148,9 @@ output inhibit_kbd_if_o ;
 reg [7:0] input_buffer,
           output_buffer ;
 
-output [15:0] devide_reg_o;
-reg    [15:0] devide_reg;
-assign        devide_reg_o = devide_reg;
+output [15:0] divide_reg_o;
+reg    [15:0] divide_reg;
+assign        divide_reg_o = divide_reg;
 
 
 reg [15:0] wb_dat_i_sampled ;
@@ -215,14 +215,14 @@ wire read_status_register = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && 
 reg  send_command_reg ;
 wire send_command = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !send_command_reg && wb_we_i  && (wb_adr_i[3:0] == 4'h4) ;
 
-reg  write_devide_reg0 ;
-wire write_devide0 = wb_cyc_i && wb_stb_i && wb_sel_i[2] && !wb_ack_o && !write_devide_reg0 && wb_we_i  && (wb_adr_i[3:0] == 4'h8) ;
+reg  write_divide_reg0 ;
+wire write_divide0 = wb_cyc_i && wb_stb_i && wb_sel_i[2] && !wb_ack_o && !write_divide_reg0 && wb_we_i  && (wb_adr_i[3:0] == 4'h8) ;
 
-//reg  read_devide_reg ;
-wire read_devide = wb_cyc_i && wb_stb_i &&  ( wb_sel_i[2]|| wb_sel_i [3] ) && !wb_we_i  && (wb_adr_i[3:0] == 4'h8) ;
+//reg  read_divide_reg ;
+wire read_divide = wb_cyc_i && wb_stb_i &&  ( wb_sel_i[2]|| wb_sel_i [3] ) && !wb_we_i  && (wb_adr_i[3:0] == 4'h8) ;
 
-reg  write_devide_reg1 ;
-wire write_devide1 = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !write_devide_reg1 && wb_we_i  && (wb_adr_i[3:0] == 4'h8) ;
+reg  write_divide_reg1 ;
+wire write_divide1 = wb_cyc_i && wb_stb_i && wb_sel_i[3] && !wb_ack_o && !write_divide_reg1 && wb_we_i  && (wb_adr_i[3:0] == 4'h8) ;
 
 
 reg  translate_o,
@@ -270,9 +270,9 @@ begin
         read_input_buffer_reg    <= #1 1'b0 ;
         write_output_buffer_reg  <= #1 1'b0 ;
         read_status_register_reg <= #1 1'b0 ;
-        write_devide_reg0        <= #1 1'b0 ;
-        //read_devide_reg          <= #1 1'b0 ;
-        write_devide_reg1        <= #1 1'b0 ;
+        write_divide_reg0        <= #1 1'b0 ;
+        //read_divide_reg          <= #1 1'b0 ;
+        write_divide_reg1        <= #1 1'b0 ;
    end
     else
     begin
@@ -280,9 +280,9 @@ begin
         read_input_buffer_reg    <= #1 read_input_buffer ;
         write_output_buffer_reg  <= #1 write_output_buffer ;
         read_status_register_reg <= #1 read_status_register ;
-        write_devide_reg0        <= #1 write_devide0 ;
-        //read_devide_reg          <= #1 read_devide ;
-        write_devide_reg1        <= #1 write_devide1 ;
+        write_divide_reg0        <= #1 write_divide0 ;
+        //read_divide_reg          <= #1 read_divide ;
+        write_divide_reg1        <= #1 write_divide1 ;
     end
 end
 
@@ -476,9 +476,9 @@ begin
 end
 
 reg [31:0] wb_dat_o ;
-wire wb_read = read_input_buffer_reg || read_status_register_reg || read_devide ;
+wire wb_read = read_input_buffer_reg || read_status_register_reg || read_divide ;
 
-wire [15:0] output_data = read_status_register_reg ? {2{status_byte}} : read_devide ? devide_reg : {2{input_buffer}} ;
+wire [15:0] output_data = read_status_register_reg ? {2{status_byte}} : read_divide ? divide_reg : {2{input_buffer}} ;
 always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
     if ( wb_rst_i )
@@ -520,13 +520,13 @@ end
 always@(posedge wb_clk_i or posedge wb_rst_i)
 begin
     if ( wb_rst_i )
-        devide_reg <= #1 8'h00 ;
+        divide_reg <= #1 8'h00 ;
     else 
       begin
-      if ( write_devide_reg0 )
-        devide_reg[7:0] <= #1 wb_dat_i_sampled[7:0] ;
-      if ( write_devide_reg1 )
-        devide_reg[15:8] <= #1 wb_dat_i_sampled[15:8] ;
+      if ( write_divide_reg0 )
+        divide_reg[7:0] <= #1 wb_dat_i_sampled[7:0] ;
+      if ( write_divide_reg1 )
+        divide_reg[15:8] <= #1 wb_dat_i_sampled[15:8] ;
       end
 end
 
