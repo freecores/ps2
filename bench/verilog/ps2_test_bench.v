@@ -125,6 +125,7 @@
 module ps2_test_bench() ;
 
 parameter [31:0] MAX_SEQUENCE_LENGTH = 10 ;
+parameter TB_DATA_DIR = "../../../bench/data";
 wire kbd_clk_cable  ;
 wire kbd_data_cable ;
 
@@ -193,10 +194,10 @@ initial
 begin
 
 
-    $readmemh("../../../bench/data/normal_scancodes_set2.hex", normal_scancode_set2_mem) ;
-    $readmemh("../../../bench/data/normal_scancodes_set1.hex", normal_scancode_set1_mem) ;
-    $readmemh("../../../bench/data/extended_scancodes_set2.hex", extended_scancode_set2_mem) ;
-    $readmemh("../../../bench/data/extended_scancodes_set1.hex", extended_scancode_set1_mem) ;
+    $readmemh({TB_DATA_DIR,"/normal_scancodes_set2.hex"}, normal_scancode_set2_mem) ;
+    $readmemh({TB_DATA_DIR,"/normal_scancodes_set1.hex"}, normal_scancode_set1_mem) ;
+    $readmemh({TB_DATA_DIR,"/extended_scancodes_set2.hex"}, extended_scancode_set2_mem) ;
+    $readmemh({TB_DATA_DIR,"/extended_scancodes_set1.hex"}, extended_scancode_set1_mem) ;
 
 
     wb_period =50;
